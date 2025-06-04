@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Aplikasi Stok Gudang Sederhana</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 32px; }
+    h1, h2 { color: #333; }
+    .container { display: flex; gap: 40px; }
+    section { min-width: 320px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    th { background: #f3f3f3; }
+    input, select, button { margin: 4px 0; padding: 6px; }
+    .flex-row { display: flex; gap: 12px; align-items: center; }
+  </style>
+</head>
+<body>
+  <h1>Stok Gudang - Barang Masuk/Keluar & Tracking</h1>
+  <div class="container">
+    <section>
+      <h2>Input Barang</h2>
+      <form id="itemForm">
+        <div>
+          <label>Nama Barang:<br>
+            <input type="text" id="itemName" required>
+          </label>
+        </div>
+        <div>
+          <label>Kode Barang:<br>
+            <input type="text" id="itemCode" required>
+          </label>
+        </div>
+        <div>
+          <label>Jumlah:<br>
+            <input type="number" id="itemQty" min="1" required>
+          </label>
+        </div>
+        <div>
+          <label>Tanggal:<br>
+            <input type="date" id="itemDate" required>
+          </label>
+        </div>
+        <div>
+          <label>Jenis:<br>
+            <select id="itemType" required>
+              <option value="masuk">Masuk</option>
+              <option value="keluar">Keluar</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit">Simpan</button>
+      </form>
+
+      <h2>Export / Import Data</h2>
+      <div class="flex-row">
+        <button id="exportBtn">Export JSON</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none">
+        <button id="importBtn">Import JSON</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Histori Barang</h2>
+      <table id="historyTable">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Nama</th>
+            <th>Kode</th>
+            <th>Jumlah</th>
+            <th>Jenis</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- data akan ditampilkan di sini -->
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    // Firebase config dari Anda
+    const firebaseConfig = {
+      apiKey: "AIzaSyCBP2jEezk-9P-aUun_3J_BJSD-tx7DYmI",
+      authDomain: "sample-firebase-ai-app-cx.firebaseapp.com",
+      projectId: "sample-firebase-ai-app-cx",
+      storageBucket: "sample-firebase-ai-app-cx.firebasestorage.app",
+      messagingSenderId: "549584254719",
+      appId: "1:549584254719:web:d67d653e3a0a7ce18f7eca"
+    };
+    // Inisialisasi Firebase
+    const app = initializeApp(firebaseConfig);
+    // Integrasi sync ke Firebase akan ditambahkan di versi berikutnya
+  </script>
+
+  <!-- Main App Script -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
