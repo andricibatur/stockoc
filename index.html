@@ -82,7 +82,10 @@
   <!-- Firebase SDK dan Firestore -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+    import { 
+      getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc,
+      enableIndexedDbPersistence
+    } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCBP2jEezk-9P-aUun_3J_BJSD-tx7DYmI",
@@ -95,6 +98,15 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+
+    // Aktifkan offline sync Firestore
+    enableIndexedDbPersistence(db).catch((err) => {
+      if (err.code == 'failed-precondition') {
+        alert("Offline sync hanya aktif di satu tab.");
+      } else if (err.code == 'unimplemented') {
+        alert("Offline sync tidak didukung di browser ini.");
+      }
+    });
 
     // Fungsi untuk render data histori dari Firestore
     async function renderHistory() {
@@ -195,7 +207,6 @@
 
     // Tampilkan histori saat halaman dibuka
     renderHistory();
-
   </script>
 </body>
 </html>
