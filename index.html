@@ -79,24 +79,123 @@
     </section>
   </div>
 
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK dan Firestore -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    // Firebase config dari Anda
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyCBP2jEezk-9P-aUun_3J_BJSD-tx7DYmI",
       authDomain: "sample-firebase-ai-app-cx.firebaseapp.com",
       projectId: "sample-firebase-ai-app-cx",
-      storageBucket: "sample-firebase-ai-app-cx.firebasestorage.app",
+      storageBucket: "sample-firebase-ai-app-cx.appspot.com",
       messagingSenderId: "549584254719",
       appId: "1:549584254719:web:d67d653e3a0a7ce18f7eca"
     };
-    // Inisialisasi Firebase
-    const app = initializeApp(firebaseConfig);
-    // Integrasi sync ke Firebase akan ditambahkan di versi berikutnya
-  </script>
 
-  <!-- Main App Script -->
-  <script type="module" src="app.js"></script>
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Fungsi untuk render data histori dari Firestore
+    async function renderHistory() {
+      const tbody = document.querySelector('#historyTable tbody');
+      tbody.innerHTML = '';
+      const querySnapshot = await getDocs(collection(db, "barang"));
+      let data = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+      // Urutkan tanggal terbaru ke atas
+      data.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+      for (const item of data) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.tanggal || ''}</td>
+          <td>${item.nama || ''}</td>
+          <td>${item.kode || ''}</td>
+          <td>${item.jumlah || ''}</td>
+          <td>${item.jenis || ''}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // Simpan data ke Firestore saat form disubmit
+    document.getElementById('itemForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const itemData = {
+        nama: document.getElementById('itemName').value.trim(),
+        kode: document.getElementById('itemCode').value.trim(),
+        jumlah: parseInt(document.getElementById('itemQty').value),
+        tanggal: document.getElementById('itemDate').value,
+        jenis: document.getElementById('itemType').value
+      };
+      try {
+        await addDoc(collection(db, "barang"), itemData);
+        alert("Data berhasil disimpan di Firebase!");
+        e.target.reset();
+        renderHistory();
+      } catch (err) {
+        alert("Gagal menyimpan ke Firebase: " + err);
+      }
+    });
+
+    // Export data dari Firestore ke file JSON
+    document.getElementById('exportBtn').onclick = async function () {
+      const querySnapshot = await getDocs(collection(db, "barang"));
+      let data = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "data-barang.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    // Import data JSON ke Firestore
+    document.getElementById('importBtn').onclick = function () {
+      document.getElementById('importFile').click();
+    };
+
+    document.getElementById('importFile').addEventListener('change', async function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const importedData = JSON.parse(text);
+        if (Array.isArray(importedData)) {
+          // Optional: Hapus semua data lama sebelum import
+          // const querySnapshot = await getDocs(collection(db, "barang"));
+          // for (const d of querySnapshot.docs) {
+          //   await deleteDoc(doc(db, "barang", d.id));
+          // }
+          for (const item of importedData) {
+            // Gunakan setDoc jika ingin menjaga ID document asli (jika ada)
+            if (item.id) {
+              const {id, ...data} = item;
+              await setDoc(doc(db, "barang", id), data);
+            } else {
+              await addDoc(collection(db, "barang"), item);
+            }
+          }
+          alert("Import data berhasil!");
+          renderHistory();
+        } else {
+          alert("Format file tidak sesuai!");
+        }
+      } catch (err) {
+        alert("Gagal import data: " + err);
+      }
+      e.target.value = ""; // reset supaya bisa upload file yang sama lagi
+    });
+
+    // Tampilkan histori saat halaman dibuka
+    renderHistory();
+
+  </script>
 </body>
 </html>
