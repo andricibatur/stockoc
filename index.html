@@ -5,10 +5,12 @@
   <title>Aplikasi Kode Barang Masuk/Keluar</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 2em; }
-    textarea, input, button { margin: 0.5em 0; }
+    textarea, input, button, select { margin: 0.5em 0; }
     .container { margin-bottom: 2em; }
     table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 6px 12px; }
     th { background: #eee; }
+    .filter-group { margin-bottom: 1em; }
+    .filter-inline > * { margin-right: 0.5em; }
   </style>
 </head>
 <body>
@@ -24,6 +26,22 @@
     <label>Input Kode Barang Keluar:</label><br>
     <textarea id="kodeKeluar" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
     <button onclick="simpanKeluar()">Simpan Keluar</button>
+  </div>
+
+  <div class="container filter-group">
+    <div class="filter-inline">
+      <label>Filter: </label>
+      <select id="filterMode" onchange="onFilterChange()">
+        <option value="semua">Semua</option>
+        <option value="harian">Harian</option>
+        <option value="mingguan">Mingguan</option>
+        <option value="terbanyak">Terbanyak</option>
+        <option value="tidaklaku">Tidak Laku</option>
+      </select>
+      <input type="date" id="filterDate" style="display:none" onchange="tampilkanLaporan()" />
+      <button onclick="tampilkanLaporan()">Terapkan Filter</button>
+      <button onclick="exportCSV()">Export CSV</button>
+    </div>
   </div>
 
   <div class="container">
@@ -44,6 +62,7 @@
     const masukStore = 'masuk';
     const keluarStore = 'keluar';
     let db;
+    let lastReportData = []; // untuk export CSV
 
     function bukaDB() {
       return new Promise((resolve, reject) => {
@@ -62,14 +81,14 @@
       });
     }
 
-    // Helper: Simpan masukan ke store tertentu
     function simpanKeStore(storeName, kodeList) {
       return bukaDB().then(db => {
         return new Promise((resolve, reject) => {
           const tx = db.transaction([storeName], 'readwrite');
           const store = tx.objectStore(storeName);
+          const now = new Date();
           kodeList.forEach(kode => {
-            store.add({ kode: kode.trim(), waktu: new Date().toISOString() });
+            store.add({ kode: kode.trim(), waktu: now.toISOString() });
           });
           tx.oncomplete = resolve;
           tx.onerror = e => reject(e.target.error);
@@ -97,7 +116,6 @@
       });
     }
 
-    // Ambil semua data dari store
     function ambilSemua(storeName) {
       return bukaDB().then(db => {
         return new Promise((resolve, reject) => {
@@ -110,38 +128,80 @@
       });
     }
 
-    // Laporan: Hitung per kode unik
+    function filterByDate(data, tanggal, rentangHari = 1) {
+      // tanggal format yyyy-mm-dd
+      const dateObj = new Date(tanggal);
+      let start = new Date(dateObj.setHours(0,0,0,0));
+      let end = new Date(start);
+      end.setDate(end.getDate() + rentangHari);
+      return data.filter(item => {
+        const t = new Date(item.waktu);
+        return t >= start && t < end;
+      });
+    }
+
+    function onFilterChange() {
+      const mode = document.getElementById('filterMode').value;
+      document.getElementById('filterDate').style.display = (mode === 'harian' || mode === 'mingguan') ? '' : 'none';
+    }
+
     async function tampilkanLaporan() {
       const masuk = await ambilSemua(masukStore);
       const keluar = await ambilSemua(keluarStore);
+      const filterMode = document.getElementById('filterMode').value;
+      const filterDate = document.getElementById('filterDate').value;
+      let masukFiltered = masuk, keluarFiltered = keluar;
+
+      // FILTER DATA
+      if (filterMode === 'harian' && filterDate) {
+        masukFiltered = filterByDate(masuk, filterDate, 1);
+        keluarFiltered = filterByDate(keluar, filterDate, 1);
+      } else if (filterMode === 'mingguan' && filterDate) {
+        masukFiltered = filterByDate(masuk, filterDate, 7);
+        keluarFiltered = filterByDate(keluar, filterDate, 7);
+      }
 
       // Hitung masuk per kode
       const masukCount = {};
-      for (const { kode } of masuk) {
+      for (const { kode } of masukFiltered) {
         if (!masukCount[kode]) masukCount[kode] = 0;
         masukCount[kode]++;
       }
       // Hitung keluar per kode
       const keluarCount = {};
-      for (const { kode } of keluar) {
+      for (const { kode } of keluarFiltered) {
         if (!keluarCount[kode]) keluarCount[kode] = 0;
         keluarCount[kode]++;
       }
-      // Gabungkan kode unik
       const semuaKode = Array.from(new Set([...Object.keys(masukCount), ...Object.keys(keluarCount)]));
 
-      // Buat tabel
+      // Gabung data
+      let dataReport = semuaKode.map(kode => ({
+        kode,
+        masuk: masukCount[kode] || 0,
+        keluar: keluarCount[kode] || 0,
+        sisa: (masukCount[kode] || 0) - (keluarCount[kode] || 0)
+      }));
+
+      // Filter tambahan
+      if (filterMode === 'terbanyak') {
+        dataReport = dataReport.sort((a, b) => b.sisa - a.sisa).slice(0, 10);
+      }
+      if (filterMode === 'tidaklaku') {
+        dataReport = dataReport.filter(d => d.sisa <= 0);
+      }
+
+      // Tabel HTML
       let html = '<table><tr><th>Kode Barang</th><th>Masuk</th><th>Keluar</th><th>Sisa</th></tr>';
-      semuaKode.forEach(kode => {
-        const m = masukCount[kode] || 0;
-        const k = keluarCount[kode] || 0;
-        html += `<tr><td>${kode}</td><td>${m}</td><td>${k}</td><td>${m-k}</td></tr>`;
+      dataReport.forEach(row => {
+        html += `<tr><td>${row.kode}</td><td>${row.masuk}</td><td>${row.keluar}</td><td>${row.sisa}</td></tr>`;
       });
       html += '</table>';
       document.getElementById('laporan').innerHTML = html;
+      lastReportData = dataReport; // simpan untuk export csv
     }
 
-    // Export/import data ke/dari JSON
+    // Export/import JSON
     async function exportData() {
       const masuk = await ambilSemua(masukStore);
       const keluar = await ambilSemua(keluarStore);
@@ -164,10 +224,8 @@
           const data = JSON.parse(e.target.result);
           if (!data.masuk || !data.keluar) throw new Error('Format file salah!');
           await bukaDB();
-          // bersihkan dulu
           await hapusSemua(masukStore);
           await hapusSemua(keluarStore);
-          // masukkan data
           await simpanBatch(masukStore, data.masuk);
           await simpanBatch(keluarStore, data.keluar);
           alert('Import berhasil!');
@@ -176,7 +234,6 @@
         }
       };
       reader.readAsText(file);
-      // clear input
       event.target.value = '';
     }
 
@@ -185,7 +242,7 @@
         return new Promise((resolve, reject) => {
           const tx = db.transaction([storeName], 'readwrite');
           const store = tx.objectStore(storeName);
-          const req = store.clear();
+          store.clear();
           tx.oncomplete = resolve;
           tx.onerror = e => reject(e.target.error);
         });
@@ -206,8 +263,30 @@
       });
     }
 
-    // Inisialisasi DB saat load
+    // Export CSV
+    function exportCSV() {
+      if (!lastReportData.length) {
+        alert('Tampilkan laporan dulu sebelum ekspor CSV!');
+        return;
+      }
+      let csv = "Kode Barang,Masuk,Keluar,Sisa\n";
+      lastReportData.forEach(row => {
+        csv += `"${row.kode}",${row.masuk},${row.keluar},${row.sisa}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'laporan-barang.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Inisialisasi
     bukaDB();
+    // Untuk auto refresh filter date input
+    document.getElementById('filterMode').addEventListener('change', onFilterChange);
+
   </script>
 </body>
 </html>
