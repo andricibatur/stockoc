@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Stok Gudang - Google Sheet API</title>
+  <title>Stok Gudang - Google Sheet + Export/Import JSON</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
     input, button { margin: 5px 0; padding: 6px; width: 100%; max-width: 300px; box-sizing: border-box; }
@@ -10,11 +10,13 @@
     th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
     th { background: #f0f0f0; }
     #form-container { max-width: 320px; }
+    .flex-row { display:flex; gap:8px; margin-top:10px;}
+    .flex-row > * { flex:1; }
   </style>
 </head>
 <body>
 
-  <h2>📦 Stok Gudang (Google Sheet)</h2>
+  <h2>📦 Stok Gudang (Google Sheet + JSON Export/Import)</h2>
 
   <div id="form-container">
     <label for="nama">Nama Barang:</label><br>
@@ -23,7 +25,13 @@
     <label for="jumlah">Jumlah:</label><br>
     <input id="jumlah" type="number" placeholder="Contoh: 100"><br>
 
-    <button id="btn-simpan">Simpan ke Sheet</button>
+    <button id="btn-simpan">Simpan ke Sheet & Local</button>
+  </div>
+
+  <div class="flex-row">
+    <button id="btn-export">Export JSON</button>
+    <input type="file" id="import-file" style="display:none">
+    <button id="btn-import">Import JSON</button>
   </div>
 
   <h3>📋 Daftar Stok</h3>
@@ -39,76 +47,110 @@
   </table>
 
   <script>
-    // URL Apps Script Web App (ganti dengan ID yang sudah diberikan Inul)
+    // URL Apps Script Web App
     const scriptURL = 'https://script.google.com/macros/s/AKfycbwG2NQgJyoNyqK8NFgA0FrKzFVgCrnQNoflOuIAVPwqctALK2idan56t8IIHPo0FCnGew/exec';
+    // LocalStorage key
+    const LOCAL_KEY = 'stokgudang_data';
 
     // Ambil elemen
     const btnSimpan = document.getElementById('btn-simpan');
     const inputNama = document.getElementById('nama');
     const inputJumlah = document.getElementById('jumlah');
     const tbody = document.getElementById('tabel-stok');
+    const btnExport = document.getElementById('btn-export');
+    const btnImport = document.getElementById('btn-import');
+    const importFile = document.getElementById('import-file');
 
-    // Fungsi untuk memuat data dari Sheet
-    function muatData() {
-      fetch(scriptURL)
-        .then(res => res.json())
-        .then(data => {
-          // data[0] diasumsikan header; skip index 0
-          tbody.innerHTML = '';
-          // urutkan terbaru di atas (data slice tanpa header, lalu reverse)
-          data.slice(1).reverse().forEach(row => {
-            const tanggal = new Date(row[0]).toLocaleString();
-            const nama = row[1];
-            const jumlah = row[2];
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>${tanggal}</td>
-              <td>${nama}</td>
-              <td>${jumlah}</td>
-            `;
-            tbody.appendChild(tr);
-          });
-        })
-        .catch(err => {
-          console.error('Error muat data:', err);
-        });
+    // Helper: Ambil data dari localStorage
+    function getDataLocal() {
+      const d = localStorage.getItem(LOCAL_KEY);
+      return d ? JSON.parse(d) : [];
     }
 
-    // Fungsi untuk menyimpan ke Sheet
-    function simpanData() {
+    // Helper: Simpan data ke localStorage
+    function setDataLocal(data) {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+    }
+
+    // Tampilkan data di tabel
+    function renderTable() {
+      const data = getDataLocal();
+      tbody.innerHTML = '';
+      data.slice().sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal)).forEach(row => {
+        const tanggal = new Date(row.tanggal).toLocaleString();
+        const nama = row.nama;
+        const jumlah = row.jumlah;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${tanggal}</td>
+          <td>${nama}</td>
+          <td>${jumlah}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Simpan data ke Sheet & LocalStorage
+    btnSimpan.addEventListener('click', function() {
       const nama = inputNama.value.trim();
       const jumlah = inputJumlah.value.trim();
       if (!nama || !jumlah) {
         alert('Isi semua kolom sebelum simpan.');
         return;
       }
-
+      // Simpan ke localStorage
+      const data = getDataLocal();
+      const newData = { tanggal: new Date().toISOString(), nama, jumlah };
+      data.push(newData);
+      setDataLocal(data);
+      renderTable();
+      // Simpan ke Google Sheet
       const formData = new URLSearchParams();
       formData.append('nama', nama);
       formData.append('jumlah', jumlah);
+      fetch(scriptURL, { method: 'POST', body: formData });
+      // Bersihkan form
+      inputNama.value = '';
+      inputJumlah.value = '';
+    });
 
-      fetch(scriptURL, {
-        method: 'POST',
-        body: formData
-      })
-      .then(res => res.text())
-      .then(resText => {
-        // Clear form dan reload tabel
-        inputNama.value = '';
-        inputJumlah.value = '';
-        muatData();
-      })
-      .catch(err => {
-        console.error('Error simpan data:', err);
-      });
-    }
+    // Export JSON
+    btnExport.addEventListener('click', function() {
+      const data = getDataLocal();
+      const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "stokgudang.json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    });
 
-    // Event listener tombol
-    btnSimpan.addEventListener('click', simpanData);
+    // Import JSON
+    btnImport.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (Array.isArray(data)) {
+            setDataLocal(data);
+            renderTable();
+            alert('Import sukses!');
+          } else {
+            alert('File tidak valid');
+          }
+        } catch (err) {
+          alert('Import gagal: file tidak valid');
+        }
+      };
+      reader.readAsText(file);
+    });
 
-    // Muat data pertama kali saat halaman dibuka
-    muatData();
+    // Tampilkan data saat halaman dibuka
+    renderTable();
   </script>
-
 </body>
 </html>
