@@ -41,6 +41,7 @@
       <input type="date" id="filterDate" style="display:none" onchange="tampilkanLaporan()" />
       <button onclick="tampilkanLaporan()">Terapkan Filter</button>
       <button onclick="exportCSV()">Export CSV</button>
+      <button onclick="syncToGoogleSheet()">Sinkron ke Google Sheet</button>
     </div>
   </div>
 
@@ -62,7 +63,10 @@
     const masukStore = 'masuk';
     const keluarStore = 'keluar';
     let db;
-    let lastReportData = []; // untuk export CSV
+    let lastReportData = []; // untuk export CSV dan sync Google Sheet
+
+    // Ganti URL_WEB_APP di bawah dengan milik Anda
+    const GOOGLE_SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbz_EMHp-RBxdCbx0WJLdSnx-SESwHri3Eph5lrneea_b1bKUMPVBwbWvgFa48nF8VsEHg/exec';
 
     function bukaDB() {
       return new Promise((resolve, reject) => {
@@ -198,7 +202,7 @@
       });
       html += '</table>';
       document.getElementById('laporan').innerHTML = html;
-      lastReportData = dataReport; // simpan untuk export csv
+      lastReportData = dataReport; // simpan untuk export csv dan sync Google Sheet
     }
 
     // Export/import JSON
@@ -282,11 +286,27 @@
       URL.revokeObjectURL(url);
     }
 
+    // Sinkronisasi ke Google Sheet via Apps Script Web App
+    function syncToGoogleSheet() {
+      if (!lastReportData.length) {
+        alert('Tampilkan laporan dulu sebelum sinkron!');
+        return;
+      }
+      fetch(GOOGLE_SHEET_API_URL, {
+        method: 'POST',
+        body: JSON.stringify(lastReportData),
+        headers: {'Content-Type': 'application/json'}
+      })
+      .then(r => r.text())
+      .then(res => {
+        alert('Sinkronisasi ke Google Sheet berhasil: ' + res);
+      })
+      .catch(e => alert('Gagal sinkron ke Google Sheet: ' + e));
+    }
+
     // Inisialisasi
     bukaDB();
-    // Untuk auto refresh filter date input
     document.getElementById('filterMode').addEventListener('change', onFilterChange);
-
   </script>
 </body>
 </html>
