@@ -1,212 +1,89 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
+  <title>Stok Gudang - Firebase</title>
   <meta charset="UTF-8">
-  <title>Aplikasi Stok Gudang Sederhana</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 32px; }
-    h1, h2 { color: #333; }
-    .container { display: flex; gap: 40px; }
-    section { min-width: 320px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
-    th { background: #f3f3f3; }
-    input, select, button { margin: 4px 0; padding: 6px; }
-    .flex-row { display: flex; gap: 12px; align-items: center; }
+    body { font-family: sans-serif; padding: 20px; }
+    input, button { margin: 5px; padding: 5px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #aaa; padding: 5px; text-align: left; }
   </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
 </head>
 <body>
-  <h1>Stok Gudang - Barang Masuk/Keluar & Tracking</h1>
-  <div class="container">
-    <section>
-      <h2>Input Barang</h2>
-      <form id="itemForm">
-        <div>
-          <label>Nama Barang:<br>
-            <input type="text" id="itemName" required>
-          </label>
-        </div>
-        <div>
-          <label>Kode Barang:<br>
-            <input type="text" id="itemCode" required>
-          </label>
-        </div>
-        <div>
-          <label>Jumlah:<br>
-            <input type="number" id="itemQty" min="1" required>
-          </label>
-        </div>
-        <div>
-          <label>Tanggal:<br>
-            <input type="date" id="itemDate" required>
-          </label>
-        </div>
-        <div>
-          <label>Jenis:<br>
-            <select id="itemType" required>
-              <option value="masuk">Masuk</option>
-              <option value="keluar">Keluar</option>
-            </select>
-          </label>
-        </div>
-        <button type="submit">Simpan</button>
-      </form>
 
-      <h2>Export / Import Data</h2>
-      <div class="flex-row">
-        <button id="exportBtn">Export JSON</button>
-        <input type="file" id="importFile" accept="application/json" style="display:none">
-        <button id="importBtn">Import JSON</button>
-      </div>
-    </section>
+  <h2>📦 Aplikasi Stok Gudang</h2>
 
-    <section>
-      <h2>Histori Barang</h2>
-      <table id="historyTable">
-        <thead>
-          <tr>
-            <th>Tanggal</th>
-            <th>Nama</th>
-            <th>Kode</th>
-            <th>Jumlah</th>
-            <th>Jenis</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- data akan ditampilkan di sini -->
-        </tbody>
-      </table>
-    </section>
-  </div>
+  <label>Nama Barang:</label><br>
+  <input id="nama" placeholder="Contoh: Indomie"><br>
 
-  <!-- Firebase SDK dan Firestore -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { 
-      getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc,
-      enableIndexedDbPersistence
-    } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+  <label>Jumlah:</label><br>
+  <input id="jumlah" type="number" placeholder="Contoh: 100"><br>
 
+  <button onclick="tambahBarang()">Tambah Stok</button>
+
+  <h3>📋 Daftar Stok Barang</h3>
+  <table>
+    <thead>
+      <tr><th>Nama</th><th>Jumlah</th><th>Waktu</th></tr>
+    </thead>
+    <tbody id="tabelStok"></tbody>
+  </table>
+
+  <script>
+    // ✅ Firebase config milik Inul
     const firebaseConfig = {
-      apiKey: "AIzaSyCBP2jEezk-9P-aUun_3J_BJSD-tx7DYmI",
-      authDomain: "sample-firebase-ai-app-cx.firebaseapp.com",
-      projectId: "sample-firebase-ai-app-cx",
-      storageBucket: "sample-firebase-ai-app-cx.appspot.com",
-      messagingSenderId: "549584254719",
-      appId: "1:549584254719:web:d67d653e3a0a7ce18f7eca"
+      apiKey: "AIzaSyCsseWUEOKNoFGlpebt5b8om4RL-62HcO4",
+      authDomain: "gudang-oc.firebaseapp.com",
+      projectId: "gudang-oc",
+      storageBucket: "gudang-oc.firebasestorage.app",
+      messagingSenderId: "152032216937",
+      appId: "1:152032216937:web:4e87a5f2514904d7841ff8"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    // ✅ Inisialisasi Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    // Aktifkan offline sync Firestore
-    enableIndexedDbPersistence(db).catch((err) => {
-      if (err.code == 'failed-precondition') {
-        alert("Offline sync hanya aktif di satu tab.");
-      } else if (err.code == 'unimplemented') {
-        alert("Offline sync tidak didukung di browser ini.");
+    // 🔸 Tambah data ke Firestore
+    function tambahBarang() {
+      const nama = document.getElementById("nama").value.trim();
+      const jumlah = parseInt(document.getElementById("jumlah").value.trim());
+
+      if (!nama || isNaN(jumlah)) {
+        alert("Lengkapi nama dan jumlah");
+        return;
       }
-    });
 
-    // Fungsi untuk render data histori dari Firestore
-    async function renderHistory() {
-      const tbody = document.querySelector('#historyTable tbody');
-      tbody.innerHTML = '';
-      const querySnapshot = await getDocs(collection(db, "barang"));
-      let data = [];
-      querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() });
+      db.collection("stok").add({
+        nama: nama,
+        jumlah: jumlah,
+        waktu: new Date()
+      }).then(() => {
+        document.getElementById("nama").value = "";
+        document.getElementById("jumlah").value = "";
       });
-      // Urutkan tanggal terbaru ke atas
-      data.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
-      for (const item of data) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${item.tanggal || ''}</td>
-          <td>${item.nama || ''}</td>
-          <td>${item.kode || ''}</td>
-          <td>${item.jumlah || ''}</td>
-          <td>${item.jenis || ''}</td>
-        `;
-        tbody.appendChild(tr);
-      }
     }
 
-    // Simpan data ke Firestore saat form disubmit
-    document.getElementById('itemForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const itemData = {
-        nama: document.getElementById('itemName').value.trim(),
-        kode: document.getElementById('itemCode').value.trim(),
-        jumlah: parseInt(document.getElementById('itemQty').value),
-        tanggal: document.getElementById('itemDate').value,
-        jenis: document.getElementById('itemType').value
-      };
-      try {
-        await addDoc(collection(db, "barang"), itemData);
-        alert("Data berhasil disimpan di Firebase!");
-        e.target.reset();
-        renderHistory();
-      } catch (err) {
-        alert("Gagal menyimpan ke Firebase: " + err);
-      }
-    });
-
-    // Export data dari Firestore ke file JSON
-    document.getElementById('exportBtn').onclick = async function () {
-      const querySnapshot = await getDocs(collection(db, "barang"));
-      let data = [];
-      querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() });
+    // 🔸 Tampilkan stok real-time
+    db.collection("stok").orderBy("waktu", "desc").onSnapshot(snapshot => {
+      const tbody = document.getElementById("tabelStok");
+      tbody.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const row = `<tr>
+          <td>${data.nama}</td>
+          <td>${data.jumlah}</td>
+          <td>${new Date(data.waktu.toDate()).toLocaleString()}</td>
+        </tr>`;
+        tbody.innerHTML += row;
       });
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = "data-barang.json";
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-
-    // Import data JSON ke Firestore
-    document.getElementById('importBtn').onclick = function () {
-      document.getElementById('importFile').click();
-    };
-
-    document.getElementById('importFile').addEventListener('change', async function (e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const text = await file.text();
-      try {
-        const importedData = JSON.parse(text);
-        if (Array.isArray(importedData)) {
-          // Optional: Hapus semua data lama sebelum import
-          // const querySnapshot = await getDocs(collection(db, "barang"));
-          // for (const d of querySnapshot.docs) {
-          //   await deleteDoc(doc(db, "barang", d.id));
-          // }
-          for (const item of importedData) {
-            // Gunakan setDoc jika ingin menjaga ID document asli (jika ada)
-            if (item.id) {
-              const {id, ...data} = item;
-              await setDoc(doc(db, "barang", id), data);
-            } else {
-              await addDoc(collection(db, "barang"), item);
-            }
-          }
-          alert("Import data berhasil!");
-          renderHistory();
-        } else {
-          alert("Format file tidak sesuai!");
-        }
-      } catch (err) {
-        alert("Gagal import data: " + err);
-      }
-      e.target.value = ""; // reset supaya bisa upload file yang sama lagi
     });
-
-    // Tampilkan histori saat halaman dibuka
-    renderHistory();
   </script>
+
 </body>
 </html>
