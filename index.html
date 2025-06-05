@@ -1,156 +1,213 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Stok Gudang - Google Sheet + Export/Import JSON</title>
+  <title>Aplikasi Kode Barang Masuk/Keluar</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    input, button { margin: 5px 0; padding: 6px; width: 100%; max-width: 300px; box-sizing: border-box; }
-    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-    th { background: #f0f0f0; }
-    #form-container { max-width: 320px; }
-    .flex-row { display:flex; gap:8px; margin-top:10px;}
-    .flex-row > * { flex:1; }
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    textarea, input, button { margin: 0.5em 0; }
+    .container { margin-bottom: 2em; }
+    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 6px 12px; }
+    th { background: #eee; }
   </style>
 </head>
 <body>
+  <h2>Aplikasi Kode Barang (Input/Output)</h2>
 
-  <h2>📦 Stok Gudang (Google Sheet + JSON Export/Import)</h2>
-
-  <div id="form-container">
-    <label for="nama">Nama Barang:</label><br>
-    <input id="nama" type="text" placeholder="Contoh: Indomie"><br>
-
-    <label for="jumlah">Jumlah:</label><br>
-    <input id="jumlah" type="number" placeholder="Contoh: 100"><br>
-
-    <button id="btn-simpan">Simpan ke Sheet & Local</button>
+  <div class="container">
+    <label>Input Kode Barang Masuk:</label><br>
+    <textarea id="kodeMasuk" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
+    <button onclick="simpanMasuk()">Simpan Masuk</button>
   </div>
 
-  <div class="flex-row">
-    <button id="btn-export">Export JSON</button>
-    <input type="file" id="import-file" style="display:none">
-    <button id="btn-import">Import JSON</button>
+  <div class="container">
+    <label>Input Kode Barang Keluar:</label><br>
+    <textarea id="kodeKeluar" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
+    <button onclick="simpanKeluar()">Simpan Keluar</button>
   </div>
 
-  <h3>📋 Daftar Stok</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>Tanggal</th>
-        <th>Nama</th>
-        <th>Jumlah</th>
-      </tr>
-    </thead>
-    <tbody id="tabel-stok"></tbody>
-  </table>
+  <div class="container">
+    <button onclick="tampilkanLaporan()">Tampilkan Laporan</button>
+    <button onclick="exportData()">Export Data (JSON)</button>
+    <input type="file" id="importFile" style="display:none" onchange="importData(event)"/>
+    <button onclick="document.getElementById('importFile').click()">Import Data (JSON)</button>
+  </div>
+
+  <div class="container">
+    <h3>Laporan Barang</h3>
+    <div id="laporan"></div>
+  </div>
 
   <script>
-    // URL Apps Script Web App
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbwG2NQgJyoNyqK8NFgA0FrKzFVgCrnQNoflOuIAVPwqctALK2idan56t8IIHPo0FCnGew/exec';
-    // LocalStorage key
-    const LOCAL_KEY = 'stokgudang_data';
+    // IndexedDB Setup
+    const dbName = 'AplikasiBarang';
+    const masukStore = 'masuk';
+    const keluarStore = 'keluar';
+    let db;
 
-    // Ambil elemen
-    const btnSimpan = document.getElementById('btn-simpan');
-    const inputNama = document.getElementById('nama');
-    const inputJumlah = document.getElementById('jumlah');
-    const tbody = document.getElementById('tabel-stok');
-    const btnExport = document.getElementById('btn-export');
-    const btnImport = document.getElementById('btn-import');
-    const importFile = document.getElementById('import-file');
-
-    // Helper: Ambil data dari localStorage
-    function getDataLocal() {
-      const d = localStorage.getItem(LOCAL_KEY);
-      return d ? JSON.parse(d) : [];
-    }
-
-    // Helper: Simpan data ke localStorage
-    function setDataLocal(data) {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
-    }
-
-    // Tampilkan data di tabel
-    function renderTable() {
-      const data = getDataLocal();
-      tbody.innerHTML = '';
-      data.slice().sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal)).forEach(row => {
-        const tanggal = new Date(row.tanggal).toLocaleString();
-        const nama = row.nama;
-        const jumlah = row.jumlah;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${tanggal}</td>
-          <td>${nama}</td>
-          <td>${jumlah}</td>
-        `;
-        tbody.appendChild(tr);
+    function bukaDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(dbName, 2);
+        req.onupgradeneeded = e => {
+          db = e.target.result;
+          if (!db.objectStoreNames.contains(masukStore)) {
+            db.createObjectStore(masukStore, { keyPath: 'id', autoIncrement: true });
+          }
+          if (!db.objectStoreNames.contains(keluarStore)) {
+            db.createObjectStore(keluarStore, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = e => { db = e.target.result; resolve(db); };
+        req.onerror = e => reject(e.target.error);
       });
     }
 
-    // Simpan data ke Sheet & LocalStorage
-    btnSimpan.addEventListener('click', function() {
-      const nama = inputNama.value.trim();
-      const jumlah = inputJumlah.value.trim();
-      if (!nama || !jumlah) {
-        alert('Isi semua kolom sebelum simpan.');
-        return;
-      }
-      // Simpan ke localStorage
-      const data = getDataLocal();
-      const newData = { tanggal: new Date().toISOString(), nama, jumlah };
-      data.push(newData);
-      setDataLocal(data);
-      renderTable();
-      // Simpan ke Google Sheet
-      const formData = new URLSearchParams();
-      formData.append('nama', nama);
-      formData.append('jumlah', jumlah);
-      fetch(scriptURL, { method: 'POST', body: formData });
-      // Bersihkan form
-      inputNama.value = '';
-      inputJumlah.value = '';
-    });
+    // Helper: Simpan masukan ke store tertentu
+    function simpanKeStore(storeName, kodeList) {
+      return bukaDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([storeName], 'readwrite');
+          const store = tx.objectStore(storeName);
+          kodeList.forEach(kode => {
+            store.add({ kode: kode.trim(), waktu: new Date().toISOString() });
+          });
+          tx.oncomplete = resolve;
+          tx.onerror = e => reject(e.target.error);
+        });
+      });
+    }
 
-    // Export JSON
-    btnExport.addEventListener('click', function() {
-      const data = getDataLocal();
-      const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+    function simpanMasuk() {
+      const raw = document.getElementById('kodeMasuk').value.trim();
+      if (!raw) return alert('Input kode barang masuk kosong!');
+      const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
+      simpanKeStore(masukStore, kodeList).then(() => {
+        alert('Berhasil disimpan!');
+        document.getElementById('kodeMasuk').value = '';
+      });
+    }
+
+    function simpanKeluar() {
+      const raw = document.getElementById('kodeKeluar').value.trim();
+      if (!raw) return alert('Input kode barang keluar kosong!');
+      const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
+      simpanKeStore(keluarStore, kodeList).then(() => {
+        alert('Berhasil disimpan!');
+        document.getElementById('kodeKeluar').value = '';
+      });
+    }
+
+    // Ambil semua data dari store
+    function ambilSemua(storeName) {
+      return bukaDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([storeName], 'readonly');
+          const store = tx.objectStore(storeName);
+          const req = store.getAll();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = e => reject(e.target.error);
+        });
+      });
+    }
+
+    // Laporan: Hitung per kode unik
+    async function tampilkanLaporan() {
+      const masuk = await ambilSemua(masukStore);
+      const keluar = await ambilSemua(keluarStore);
+
+      // Hitung masuk per kode
+      const masukCount = {};
+      for (const { kode } of masuk) {
+        if (!masukCount[kode]) masukCount[kode] = 0;
+        masukCount[kode]++;
+      }
+      // Hitung keluar per kode
+      const keluarCount = {};
+      for (const { kode } of keluar) {
+        if (!keluarCount[kode]) keluarCount[kode] = 0;
+        keluarCount[kode]++;
+      }
+      // Gabungkan kode unik
+      const semuaKode = Array.from(new Set([...Object.keys(masukCount), ...Object.keys(keluarCount)]));
+
+      // Buat tabel
+      let html = '<table><tr><th>Kode Barang</th><th>Masuk</th><th>Keluar</th><th>Sisa</th></tr>';
+      semuaKode.forEach(kode => {
+        const m = masukCount[kode] || 0;
+        const k = keluarCount[kode] || 0;
+        html += `<tr><td>${kode}</td><td>${m}</td><td>${k}</td><td>${m-k}</td></tr>`;
+      });
+      html += '</table>';
+      document.getElementById('laporan').innerHTML = html;
+    }
+
+    // Export/import data ke/dari JSON
+    async function exportData() {
+      const masuk = await ambilSemua(masukStore);
+      const keluar = await ambilSemua(keluarStore);
+      const jsonData = JSON.stringify({ masuk, keluar }, null, 2);
+      const blob = new Blob([jsonData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = "stokgudang.json";
+      a.download = 'data-barang.json';
       a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 100);
-    });
+      URL.revokeObjectURL(url);
+    }
 
-    // Import JSON
-    btnImport.addEventListener('click', () => importFile.click());
-    importFile.addEventListener('change', function(e) {
-      const file = e.target.files[0];
+    async function importData(event) {
+      const file = event.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = function(ev) {
+      reader.onload = async function(e) {
         try {
-          const data = JSON.parse(ev.target.result);
-          if (Array.isArray(data)) {
-            setDataLocal(data);
-            renderTable();
-            alert('Import sukses!');
-          } else {
-            alert('File tidak valid');
-          }
+          const data = JSON.parse(e.target.result);
+          if (!data.masuk || !data.keluar) throw new Error('Format file salah!');
+          await bukaDB();
+          // bersihkan dulu
+          await hapusSemua(masukStore);
+          await hapusSemua(keluarStore);
+          // masukkan data
+          await simpanBatch(masukStore, data.masuk);
+          await simpanBatch(keluarStore, data.keluar);
+          alert('Import berhasil!');
         } catch (err) {
-          alert('Import gagal: file tidak valid');
+          alert('Gagal import: ' + err.message);
         }
       };
       reader.readAsText(file);
-    });
+      // clear input
+      event.target.value = '';
+    }
 
-    // Tampilkan data saat halaman dibuka
-    renderTable();
+    function hapusSemua(storeName) {
+      return bukaDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([storeName], 'readwrite');
+          const store = tx.objectStore(storeName);
+          const req = store.clear();
+          tx.oncomplete = resolve;
+          tx.onerror = e => reject(e.target.error);
+        });
+      });
+    }
+
+    function simpanBatch(storeName, dataArr) {
+      return bukaDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([storeName], 'readwrite');
+          const store = tx.objectStore(storeName);
+          dataArr.forEach(data => {
+            store.add({ kode: data.kode, waktu: data.waktu });
+          });
+          tx.oncomplete = resolve;
+          tx.onerror = e => reject(e.target.error);
+        });
+      });
+    }
+
+    // Inisialisasi DB saat load
+    bukaDB();
   </script>
 </body>
 </html>
