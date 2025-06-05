@@ -1,88 +1,113 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Stok Gudang - Firebase</title>
   <meta charset="UTF-8">
+  <title>Stok Gudang - Google Sheet API</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
-    input, button { margin: 5px; padding: 5px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #aaa; padding: 5px; text-align: left; }
+    input, button { margin: 5px 0; padding: 6px; width: 100%; max-width: 300px; box-sizing: border-box; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    th { background: #f0f0f0; }
+    #form-container { max-width: 320px; }
   </style>
-
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
 </head>
 <body>
 
-  <h2>📦 Aplikasi Stok Gudang</h2>
+  <h2>📦 Stok Gudang (Google Sheet)</h2>
 
-  <label>Nama Barang:</label><br>
-  <input id="nama" placeholder="Contoh: Indomie"><br>
+  <div id="form-container">
+    <label for="nama">Nama Barang:</label><br>
+    <input id="nama" type="text" placeholder="Contoh: Indomie"><br>
 
-  <label>Jumlah:</label><br>
-  <input id="jumlah" type="number" placeholder="Contoh: 100"><br>
+    <label for="jumlah">Jumlah:</label><br>
+    <input id="jumlah" type="number" placeholder="Contoh: 100"><br>
 
-  <button onclick="tambahBarang()">Tambah Stok</button>
+    <button id="btn-simpan">Simpan ke Sheet</button>
+  </div>
 
-  <h3>📋 Daftar Stok Barang</h3>
+  <h3>📋 Daftar Stok</h3>
   <table>
     <thead>
-      <tr><th>Nama</th><th>Jumlah</th><th>Waktu</th></tr>
+      <tr>
+        <th>Tanggal</th>
+        <th>Nama</th>
+        <th>Jumlah</th>
+      </tr>
     </thead>
-    <tbody id="tabelStok"></tbody>
+    <tbody id="tabel-stok"></tbody>
   </table>
 
   <script>
-    // ✅ Firebase config milik Inul
-    const firebaseConfig = {
-      apiKey: "AIzaSyCsseWUEOKNoFGlpebt5b8om4RL-62HcO4",
-      authDomain: "gudang-oc.firebaseapp.com",
-      projectId: "gudang-oc",
-      storageBucket: "gudang-oc.firebasestorage.app",
-      messagingSenderId: "152032216937",
-      appId: "1:152032216937:web:4e87a5f2514904d7841ff8"
-    };
+    // URL Apps Script Web App (ganti dengan ID yang sudah diberikan Inul)
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbwG2NQgJyoNyqK8NFgA0FrKzFVgCrnQNoflOuIAVPwqctALK2idan56t8IIHPo0FCnGew/exec';
 
-    // ✅ Inisialisasi Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    // Ambil elemen
+    const btnSimpan = document.getElementById('btn-simpan');
+    const inputNama = document.getElementById('nama');
+    const inputJumlah = document.getElementById('jumlah');
+    const tbody = document.getElementById('tabel-stok');
 
-    // 🔸 Tambah data ke Firestore
-    function tambahBarang() {
-      const nama = document.getElementById("nama").value.trim();
-      const jumlah = parseInt(document.getElementById("jumlah").value.trim());
+    // Fungsi untuk memuat data dari Sheet
+    function muatData() {
+      fetch(scriptURL)
+        .then(res => res.json())
+        .then(data => {
+          // data[0] diasumsikan header; skip index 0
+          tbody.innerHTML = '';
+          // urutkan terbaru di atas (data slice tanpa header, lalu reverse)
+          data.slice(1).reverse().forEach(row => {
+            const tanggal = new Date(row[0]).toLocaleString();
+            const nama = row[1];
+            const jumlah = row[2];
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${tanggal}</td>
+              <td>${nama}</td>
+              <td>${jumlah}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        })
+        .catch(err => {
+          console.error('Error muat data:', err);
+        });
+    }
 
-      if (!nama || isNaN(jumlah)) {
-        alert("Lengkapi nama dan jumlah");
+    // Fungsi untuk menyimpan ke Sheet
+    function simpanData() {
+      const nama = inputNama.value.trim();
+      const jumlah = inputJumlah.value.trim();
+      if (!nama || !jumlah) {
+        alert('Isi semua kolom sebelum simpan.');
         return;
       }
 
-      db.collection("stok").add({
-        nama: nama,
-        jumlah: jumlah,
-        waktu: new Date()
-      }).then(() => {
-        document.getElementById("nama").value = "";
-        document.getElementById("jumlah").value = "";
+      const formData = new URLSearchParams();
+      formData.append('nama', nama);
+      formData.append('jumlah', jumlah);
+
+      fetch(scriptURL, {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.text())
+      .then(resText => {
+        // Clear form dan reload tabel
+        inputNama.value = '';
+        inputJumlah.value = '';
+        muatData();
+      })
+      .catch(err => {
+        console.error('Error simpan data:', err);
       });
     }
 
-    // 🔸 Tampilkan stok real-time
-    db.collection("stok").orderBy("waktu", "desc").onSnapshot(snapshot => {
-      const tbody = document.getElementById("tabelStok");
-      tbody.innerHTML = "";
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const row = `<tr>
-          <td>${data.nama}</td>
-          <td>${data.jumlah}</td>
-          <td>${new Date(data.waktu.toDate()).toLocaleString()}</td>
-        </tr>`;
-        tbody.innerHTML += row;
-      });
-    });
+    // Event listener tombol
+    btnSimpan.addEventListener('click', simpanData);
+
+    // Muat data pertama kali saat halaman dibuka
+    muatData();
   </script>
 
 </body>
