@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Generator for Xprinter</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .input-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .input-table th, .input-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .input-table th {
+            background-color: #f2f2f2;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .barcode-container {
+            margin-top: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+        .barcode-item {
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 5px;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .printable-area, .printable-area * {
+                visibility: visible;
+            }
+            .printable-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .barcode-item {
+                page-break-inside: avoid;
+            }
+        }
+        .print-settings {
+            background-color: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="no-print">Barcode Generator for Xprinter</h1>
+    
+    <div class="print-settings no-print">
+        <h3>Printer Settings</h3>
+        <label for="paperWidth">Lebar Kertas (mm):</label>
+        <input type="number" id="paperWidth" value="80" min="50" max="100">
+        
+        <label for="barcodeHeight">Tinggi Barcode (mm):</label>
+        <input type="number" id="barcodeHeight" value="15" min="5" max="50">
+        
+        <label for="barcodeType">Tipe Barcode:</label>
+        <select id="barcodeType">
+            <option value="CODE128">CODE128</option>
+            <option value="EAN13">EAN13</option>
+            <option value="CODE39">CODE39</option>
+            <option value="ITF14">ITF14</option>
+        </select>
+    </div>
+    
+    <table class="input-table no-print">
+        <thead>
+            <tr>
+                <th>Input Text</th>
+                <th>Jumlah Barcode</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><input type="text" id="input1" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count1" min="1" value="1"></td>
+            </tr>
+            <tr>
+                <td><input type="text" id="input2" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count2" min="1" value="1"></td>
+            </tr>
+            <tr>
+                <td><input type="text" id="input3" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count3" min="1" value="1"></td>
+            </tr>
+            <tr>
+                <td><input type="text" id="input4" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count4" min="1" value="1"></td>
+            </tr>
+            <tr>
+                <td><input type="text" id="input5" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count5" min="1" value="1"></td>
+            </tr>
+            <tr>
+                <td><input type="text" id="input6" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count6" min="1" value="1"></td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <div class="button-container no-print">
+        <button onclick="generateBarcodes()">Generate Barcode</button>
+        <button onclick="window.print()">Print Barcode</button>
+        <button onclick="clearAll()">Clear All</button>
+    </div>
+    
+    <div id="printable-area" class="printable-area">
+        <div id="barcode-container" class="barcode-container"></div>
+    </div>
+    
+    <script>
+        function generateBarcodes() {
+            const container = document.getElementById('barcode-container');
+            container.innerHTML = '';
+            
+            const paperWidth = parseInt(document.getElementById('paperWidth').value);
+            const barcodeHeight = parseInt(document.getElementById('barcodeHeight').value);
+            const barcodeType = document.getElementById('barcodeType').value;
+            
+            // Convert mm to pixels (approximate)
+            const heightInPx = Math.round(barcodeHeight * 3.78);
+            
+            for (let i = 1; i <= 6; i++) {
+                const inputText = document.getElementById(`input${i}`).value.trim();
+                const count = parseInt(document.getElementById(`count${i}`).value);
+                
+                if (inputText && count > 0) {
+                    for (let j = 0; j < count; j++) {
+                        const barcodeItem = document.createElement('div');
+                        barcodeItem.className = 'barcode-item';
+                        
+                        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                        svg.setAttribute('jsbarcode-value', inputText);
+                        svg.setAttribute('jsbarcode-format', barcodeType);
+                        svg.setAttribute('jsbarcode-displayvalue', 'true');
+                        svg.setAttribute('jsbarcode-height', heightInPx);
+                        svg.setAttribute('jsbarcode-width', '1.5');
+                        svg.setAttribute('jsbarcode-margin', '5');
+                        svg.style.width = `${paperWidth}mm`;
+                        svg.style.maxWidth = `${paperWidth}mm`;
+                        
+                        barcodeItem.appendChild(svg);
+                        container.appendChild(barcodeItem);
+                        
+                        JsBarcode(svg).init();
+                    }
+                }
+            }
+        }
+        
+        function clearAll() {
+            document.getElementById('barcode-container').innerHTML = '';
+            for (let i = 1; i <= 6; i++) {
+                document.getElementById(`input${i}`).value = '';
+                document.getElementById(`count${i}`).value = '1';
+            }
+        }
+        
+        // Auto generate when Enter key is pressed
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generateBarcodes();
+            }
+        });
+    </script>
+</body>
+      </html>
