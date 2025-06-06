@@ -11,6 +11,22 @@
     th { background: #eee; }
     .filter-group { margin-bottom: 1em; }
     .filter-inline > * { margin-right: 0.5em; }
+    /* Animasi klip-klip */
+    @keyframes blink {
+      0% { background-color: #f7ff72; }
+      50% { background-color: #fff; }
+      100% { background-color: #f7ff72; }
+    }
+    .blink {
+      animation: blink 1s linear infinite;
+      border: 2px solid #f7ff72 !important;
+      color: #d78400 !important;
+      font-weight: bold;
+    }
+    .disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -41,8 +57,9 @@
       <input type="date" id="filterDate" style="display:none" onchange="tampilkanLaporan()" />
       <button onclick="tampilkanLaporan()">Terapkan Filter</button>
       <button onclick="exportCSV()">Export CSV</button>
-      <button onclick="syncToSheetDB()">Sinkron ke Google Sheet</button>
+      <button id="syncBtn" onclick="syncToSheetDB()">Sinkron ke Google Sheet</button>
     </div>
+    <span id="syncInfo" style="color:#b19c00;margin-left:1em"></span>
   </div>
 
   <div class="container">
@@ -67,6 +84,52 @@
 
     // SheetDB API Endpoint
     const SHEETDB_API = 'https://sheetdb.io/api/v1/8l3pk21z7kq20';
+
+    // Counter transaksi yang belum di-sync
+    const SYNC_COUNTER_KEY = 'syncCounter';
+    const SYNC_TRIGGER = 30;
+    let syncTriggered = false; // true jika tombol sync sudah ditekan (reset setelah sync)
+
+    // --- Util Counter
+    function getSyncCounter() {
+      return parseInt(localStorage.getItem(SYNC_COUNTER_KEY) || "0", 10);
+    }
+    function setSyncCounter(val) {
+      localStorage.setItem(SYNC_COUNTER_KEY, val);
+    }
+    function resetSyncCounter() {
+      setSyncCounter(0);
+      syncTriggered = false;
+      updateSyncButton();
+    }
+    function incSyncCounter(by = 1) {
+      let v = getSyncCounter();
+      v += by;
+      setSyncCounter(v);
+      updateSyncButton();
+    }
+
+    function updateSyncButton() {
+      const btn = document.getElementById('syncBtn');
+      const info = document.getElementById('syncInfo');
+      const counter = getSyncCounter();
+      if (counter >= SYNC_TRIGGER && !syncTriggered) {
+        btn.classList.add('blink');
+        btn.classList.remove('disabled');
+        btn.disabled = false;
+        info.innerText = `Transaksi belum di-sync: ${counter}. Segera sinkron!`;
+      } else if (syncTriggered) {
+        btn.classList.remove('blink');
+        btn.classList.add('disabled');
+        btn.disabled = true;
+        info.innerText = 'Sudah sinkron, silakan input data lagi.';
+      } else {
+        btn.classList.remove('blink');
+        btn.classList.remove('disabled');
+        btn.disabled = false;
+        info.innerText = '';
+      }
+    }
 
     function bukaDB() {
       return new Promise((resolve, reject) => {
@@ -107,6 +170,7 @@
       simpanKeStore(masukStore, kodeList).then(() => {
         alert('Berhasil disimpan!');
         document.getElementById('kodeMasuk').value = '';
+        incSyncCounter(kodeList.length);
       });
     }
 
@@ -117,6 +181,7 @@
       simpanKeStore(keluarStore, kodeList).then(() => {
         alert('Berhasil disimpan!');
         document.getElementById('kodeKeluar').value = '';
+        incSyncCounter(kodeList.length);
       });
     }
 
@@ -293,6 +358,11 @@
         return;
       }
       // SheetDB menerima format: { data: [ {kode:..., masuk:..., keluar:..., sisa:...}, ... ] }
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true;
+      btn.classList.remove('blink');
+      btn.classList.add('disabled');
+      document.getElementById('syncInfo').innerText = 'Sinkronisasi sedang berlangsung...';
       fetch(SHEETDB_API + "?sheet=Sheet1", {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -302,16 +372,30 @@
       .then(res => {
         if (res && res.created) {
           alert('Sinkronisasi ke Google SheetDB berhasil!');
+          syncTriggered = true;
+          resetSyncCounter();
         } else {
           alert('Sinkron ke Google SheetDB GAGAL! (Cek format sheetnya)');
+          syncTriggered = false;
+          updateSyncButton();
         }
       })
-      .catch(e => alert('Gagal sinkron ke Google SheetDB: ' + e));
+      .catch(e => {
+        alert('Gagal sinkron ke Google SheetDB: ' + e);
+        syncTriggered = false;
+        updateSyncButton();
+      });
     }
 
     // Inisialisasi
-    bukaDB();
+    bukaDB().then(() => {
+      updateSyncButton();
+    });
     document.getElementById('filterMode').addEventListener('change', onFilterChange);
+
+    // Pastikan update tombol setiap reload
+    window.addEventListener('DOMContentLoaded', updateSyncButton);
+
   </script>
 </body>
 </html>
