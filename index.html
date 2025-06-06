@@ -3,15 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Aplikasi Barang - Export/Import JSON & Sync Google Sheets</title>
+  <title>Aplikasi Barang - Export/Import/Backup GitHub & Google Sheets</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 2em; background: #f7f7f7; }
     table { border-collapse: collapse; width: 100%; margin-bottom: 1em; background: #fff; }
     th, td { border: 1px solid #ccc; padding: 8px 12px; }
     th { background: #eee; }
-    input, button { padding: 6px 10px; margin: 4px 0; }
+    input, button, select { padding: 6px 10px; margin: 4px 0; }
     .actions button { margin-right: 4px; }
     .import-export { margin: 1em 0; }
+    .github-backup { background: #e6f0ff; padding: 1em; border-radius: 6px; margin-bottom: 1em; border: 1px solid #b3d1ff }
+    .github-backup label { display: block; margin: 3px 0 2px 0; }
+    .github-backup input { width: 350px; max-width: 100%; }
+    .github-backup small { font-size: 12px; color: #888; }
     .sheetdb-box { background: #e6ffe6; padding: 1em; margin-bottom: 1em; border: 1px solid #b3ffb3; border-radius: 6px; }
     .sheetdb-box span { font-size: 13px; color: #222; }
   </style>
@@ -27,7 +31,26 @@
   <span id="sheetdbStatus"></span>
 </div>
 
-<!-- Form input -->
+<!-- FORM BACKUP GITHUB -->
+<div class="github-backup">
+  <b>Backup ke GitHub</b> <br>
+  <label>
+    Personal Access Token:
+    <input type="password" id="githubToken" placeholder="ghp_xxx...">
+    <small>(Buat di: <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings</a> &mdash; scope: <b>repo</b>)</small>
+  </label>
+  <label>
+    Owner / Repo:
+    <input type="text" id="githubRepo" placeholder="username/repo" value="">
+  </label>
+  <label>
+    Path file di repo:
+    <input type="text" id="githubFilePath" placeholder="data-barang.json" value="data-barang.json">
+  </label>
+  <button onclick="backupToGitHub()">Backup ke GitHub</button>
+  <span id="githubStatus"></span>
+</div>
+
 <form id="barangForm">
   <input type="hidden" id="editIndex" value="">
   <input type="text" id="nama" placeholder="Nama Barang" required />
@@ -36,7 +59,6 @@
   <button type="button" id="cancelEdit" style="display:none;">Batal Edit</button>
 </form>
 
-<!-- Export/Import -->
 <div class="import-export">
   <button onclick="exportJSON()">Export JSON</button>
   <label style="margin-left:1em; cursor:pointer;">
@@ -61,6 +83,71 @@
 <script>
 const STORAGE_KEY = 'barangDataV1';
 let data = [];
+const SHEETDB_API = "https://sheetdb.io/api/v1/8l3pk21z7kq20";
+
+// ---- SheetDB Integration ----
+// Sinkronisasi: kirim data ke Google Sheets (replace semua data lama)
+async function syncToSheetDB() {
+  const status = document.getElementById("sheetdbStatus");
+  status.textContent = "Menyimpan ke Google Sheets...";
+  status.style.color = "#222";
+  try {
+    // 1. Reset/hapus semua data lama
+    await fetch(SHEETDB_API + "/all", { method:"DELETE" });
+    // 2. POST data baru (format: {data: [ {nama:..., jumlah:...}, ... ]})
+    const dataToSend = data.map(row => ({
+      nama: row.nama,
+      jumlah: row.jumlah
+    }));
+    const res = await fetch(SHEETDB_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: dataToSend })
+    });
+    if(res.ok) {
+      status.textContent = "Berhasil sync ke Google Sheets!";
+      status.style.color = "green";
+    } else {
+      status.textContent = "Gagal sync! Cek SheetDB API.";
+      status.style.color = "red";
+    }
+  } catch (e) {
+    status.textContent = "Gagal koneksi ke API SheetDB!";
+    status.style.color = "red";
+  }
+}
+
+// Ambil data dari Google Sheets via SheetDB
+async function fetchFromSheetDB() {
+  const status = document.getElementById("sheetdbStatus");
+  status.textContent = "Mengambil data dari Google Sheets...";
+  status.style.color = "#222";
+  try {
+    const res = await fetch(SHEETDB_API);
+    if(res.ok) {
+      const sheetData = await res.json();
+      if(Array.isArray(sheetData)) {
+        data = sheetData.map(row => ({
+          nama: row.nama || "",
+          jumlah: Number(row.jumlah || 0)
+        }));
+        saveData();
+        renderTable();
+        status.textContent = "Data berhasil diambil dari Google Sheets!";
+        status.style.color = "green";
+      } else {
+        status.textContent = "Data tidak valid dari SheetDB.";
+        status.style.color = "red";
+      }
+    } else {
+      status.textContent = "Gagal mengambil data!";
+      status.style.color = "red";
+    }
+  } catch(e) {
+    status.textContent = "Gagal koneksi ke API SheetDB!";
+    status.style.color = "red";
+  }
+}
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -154,69 +241,56 @@ function importJSON(ev) {
   reader.readAsText(file);
 }
 
-// ---- SheetDB Integration ----
-const SHEETDB_API = "https://sheetdb.io/api/v1/8l3pk21z7kq20";
-
-// Sinkronisasi: kirim data ke Google Sheets (replace semua data lama)
-async function syncToSheetDB() {
-  const status = document.getElementById("sheetdbStatus");
-  status.textContent = "Menyimpan ke Google Sheets...";
-  status.style.color = "#222";
-  // Hapus semua data lama di SheetDB (reset), lalu POST data baru
+// --- GITHUB BACKUP FITUR ---
+async function backupToGitHub() {
+  const token = document.getElementById("githubToken").value.trim();
+  const repo = document.getElementById("githubRepo").value.trim();
+  const filePath = document.getElementById("githubFilePath").value.trim();
+  const status = document.getElementById("githubStatus");
+  if(!token || !repo || !filePath) {
+    status.textContent = "Isi semua data GitHub!";
+    status.style.color = "red";
+    return;
+  }
+  status.textContent = "Mengecek file...";
+  status.style.color = "#333";
+  // Langkah 1: cek apakah file sudah ada (fetch sha)
+  let sha = undefined;
   try {
-    // 1. Reset/hapus semua data lama
-    await fetch(SHEETDB_API + "/all", { method:"DELETE" });
-    // 2. POST data baru (format: {data: [ {nama:..., jumlah:...}, ... ]})
-    const dataToSend = data.map(row => ({
-      nama: row.nama,
-      jumlah: row.jumlah
-    }));
-    const res = await fetch(SHEETDB_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: dataToSend })
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
+      headers: { Authorization: `token ${token}` }
     });
-    if(res.ok) {
-      status.textContent = "Berhasil sync ke Google Sheets!";
+    if(res.status === 200) {
+      const json = await res.json();
+      sha = json.sha;
+    }
+  } catch {}
+  // Langkah 2: push file (PUT)
+  status.textContent = "Backup ke GitHub...";
+  const body = {
+    message: `Backup data barang (${new Date().toISOString()})`,
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)))),
+    sha: sha
+  };
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `token ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    if(res.status === 201 || res.status === 200) {
+      status.textContent = "Berhasil backup ke GitHub!";
       status.style.color = "green";
     } else {
-      status.textContent = "Gagal sync! Cek SheetDB API.";
+      const err = await res.json();
+      status.textContent = "Gagal: " + (err && err.message ? err.message : res.status);
       status.style.color = "red";
     }
   } catch (e) {
-    status.textContent = "Gagal koneksi ke API SheetDB!";
-    status.style.color = "red";
-  }
-}
-
-// Ambil data dari Google Sheets via SheetDB
-async function fetchFromSheetDB() {
-  const status = document.getElementById("sheetdbStatus");
-  status.textContent = "Mengambil data dari Google Sheets...";
-  status.style.color = "#222";
-  try {
-    const res = await fetch(SHEETDB_API);
-    if(res.ok) {
-      const sheetData = await res.json();
-      if(Array.isArray(sheetData)) {
-        data = sheetData.map(row => ({
-          nama: row.nama || "",
-          jumlah: Number(row.jumlah || 0)
-        }));
-        saveData();
-        renderTable();
-        status.textContent = "Data berhasil diambil dari Google Sheets!";
-        status.style.color = "green";
-      } else {
-        status.textContent = "Data tidak valid dari SheetDB.";
-        status.style.color = "red";
-      }
-    } else {
-      status.textContent = "Gagal mengambil data!";
-      status.style.color = "red";
-    }
-  } catch(e) {
-    status.textContent = "Gagal koneksi ke API SheetDB!";
+    status.textContent = "Error koneksi atau token salah!";
     status.style.color = "red";
   }
 }
