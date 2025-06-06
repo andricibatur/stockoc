@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Absensi Karyawan</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <style>
+    body {
+      font-family: 'Roboto', Arial, sans-serif;
+      background: linear-gradient(120deg,#f0f7fa,#e8eaf6 100%);
+      margin: 0;
+      min-height: 100vh;
+    }
+    .absen-container {
+      background: #fff;
+      max-width: 440px;
+      margin: 36px auto 0 auto;
+      padding: 28px 28px 18px 28px;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(60,60,90,0.11), 0 1.5px 4px rgba(0,0,0,0.07);
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.1rem;
+      color: #30455b;
+      margin-bottom: 8px;
+      margin-top: 0;
+      letter-spacing: 0.01em;
+    }
+    .desc {
+      color: #6b7a89;
+      font-size: 1.09rem;
+      margin-bottom: 24px;
+    }
+    label {
+      font-size: 1.09rem;
+      color: #374151;
+    }
+    input, select {
+      font-size: 1.07rem;
+      padding: 7px 10px;
+      border-radius: 7px;
+      border: 1px solid #b7c3dd;
+      margin: 0.6em 0 1.1em 0;
+      width: 88%;
+      outline: none;
+      transition: border .13s;
+    }
+    input:focus {
+      border: 1.5px solid #607fdc;
+    }
+    .form-group {
+      margin-bottom: 0.6em;
+      text-align: left;
+    }
+    .btn {
+      background: linear-gradient(90deg, #e3f0ff 0%, #c6dafc 100%);
+      color: #2957a4;
+      border: 1px solid #b6d2fa;
+      border-radius: 7px;
+      padding: 10px 28px;
+      font-size: 1.05rem;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 2px 7px rgba(100,130,180,0.07);
+      transition: background 0.18s, color 0.18s;
+      outline: none;
+      margin: 0 0.6em 0.5em 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .btn:active, .btn:focus {
+      background: linear-gradient(90deg, #d0e5ff 0%, #a7c7f7 100%);
+      color: #183d73;
+    }
+    .laporan-box {
+      background: #f6fbff;
+      border-radius:12px;
+      margin: 22px 0 0 0;
+      padding: 10px 4px 16px 4px;
+      box-shadow: 0 2px 6px rgba(80,120,200,.04);
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 1rem;
+      margin: 0;
+    }
+    th, td {
+      border: 1px solid #c5d0e8;
+      padding: 7px 10px;
+      text-align: center;
+    }
+    th {
+      background: #e3eafc;
+      color: #3857a4;
+      font-weight: 500;
+    }
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+    .action-btn {
+      font-size: 1.1rem;
+      color: #3857a4;
+      background: none;
+      border: none;
+      cursor: pointer;
+      margin: 0 2px;
+      padding: 2px 5px;
+      border-radius: 6px;
+      transition: background .14s;
+    }
+    .action-btn:hover {
+      background: #e0e7ff;
+    }
+    .export-group {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .filter-row {
+      margin: 12px 0 4px 0;
+      text-align: left;
+    }
+    .status-hadir {
+      background: #e4fbe4;
+      color: #389238;
+      border-radius: 8px;
+      padding: 2px 8px;
+      font-weight: 500;
+    }
+    .status-terlambat {
+      background: #fff1d6;
+      color: #be7500;
+      border-radius: 8px;
+      padding: 2px 8px;
+      font-weight: 500;
+    }
+    .status-izin {
+      background: #e3e8ff;
+      color: #3847a4;
+      border-radius: 8px;
+      padding: 2px 8px;
+      font-weight: 500;
+    }
+    .footer {
+      margin-top: 18px;
+      color: #888;
+      font-size: 0.97rem;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+    @media (max-width: 540px) {
+      .absen-container { max-width: 99vw; padding: 14px 3vw 10px 3vw; }
+      h1 { font-size: 1.1rem; }
+      .btn { padding: 7px 10px; font-size: .97rem; }
+      th, td { padding: 5px 5px; font-size: .97rem; }
+    }
+  </style>
+  <!-- SheetJS for Excel Export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF for PDF Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <div class="absen-container">
+    <h1><span class="material-icons" style="font-size:2.1rem;vertical-align:middle;color:#3a70d6;margin-right:5px;">how_to_reg</span>Absensi Karyawan</h1>
+    <div class="desc">Silakan isi absensi dengan nama asli dan pilih status. <br>Waktu otomatis direkam saat Absen Masuk maupun Pulang.</div>
+    <form id="absenForm" autocomplete="off" onsubmit="return false;">
+      <div class="form-group">
+        <label>Nama Karyawan</label><br>
+        <input type="text" id="nama" required placeholder="Masukkan nama...">
+      </div>
+      <div class="form-group">
+        <label>Status</label><br>
+        <select id="status" required>
+          <option value="Hadir">Hadir</option>
+          <option value="Terlambat">Terlambat</option>
+          <option value="Izin">Izin</option>
+        </select>
+      </div>
+      <div class="form-group" id="keteranganField" style="display:none;">
+        <label>Keterangan</label><br>
+        <input type="text" id="keterangan" placeholder="Keterangan izin/catatan">
+      </div>
+      <button class="btn" onclick="absenMasuk()"><span class="material-icons">login</span>Absen Masuk</button>
+      <button class="btn" onclick="absenPulang()"><span class="material-icons">logout</span>Absen Pulang</button>
+      <button class="btn" type="button" onclick="resetForm()"><span class="material-icons">refresh</span>Reset</button>
+    </form>
+    <div class="filter-row">
+      <label>Filter Tanggal: </label>
+      <input type="date" id="filterTanggal" onchange="renderLaporan()" />
+      <button class="btn" style="padding:4px 15px;font-size:0.98rem;" onclick="resetFilterTanggal()">Semua</button>
+    </div>
+    <div class="laporan-box" id="laporanBox"></div>
+    <div class="export-group">
+      <button class="btn" onclick="exportExcel()"><span class="material-icons">table_view</span>Export Excel</button>
+      <button class="btn" onclick="exportPDF()"><span class="material-icons">picture_as_pdf</span>Export PDF</button>
+      <button class="btn" onclick="exportData()"><span class="material-icons">file_download</span>Export Data (JSON)</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)"/>
+      <button class="btn" onclick="document.getElementById('importFile').click()"><span class="material-icons">file_upload</span>Import Data</button>
+      <button class="btn" onclick="hapusSemua()" style="background:#fff2f0;color:#c13d25;border:1px solid #eaa6a6;"><span class="material-icons">delete</span>Hapus Semua</button>
+    </div>
+    <div class="footer">
+      &copy; 2025 Absensi Karyawan | Fitur: Absen Masuk/Pulang, Status, Filter, Export Excel/PDF/JSON, Import, Timestamp Otomatis
+    </div>
+  </div>
+  <script>
+    // IndexedDB Setup
+    const dbName = 'AbsensiKaryawan';
+    const storeName = 'absensi';
+    let db;
+
+    // Open IndexedDB
+    function bukaDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(dbName, 1);
+        req.onupgradeneeded = e => {
+          db = e.target.result;
+          if (!db.objectStoreNames.contains(storeName)) {
+            db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = e => { db = e.target.result; resolve(db); };
+        req.onerror = e => reject(e.target.error);
+      });
+    }
+
+    // Add or update absen masuk
+    async function absenMasuk() {
+      const nama = document.getElementById('nama').value.trim();
+      const status = document.getElementById('status').value;
+      const keterangan = document.getElementById('keterangan').value.trim();
+      if (!nama) { alert('Nama wajib diisi.'); return; }
+
+      await bukaDB();
+      // Cek jika sudah absen masuk hari ini
+      const today = (new Date()).toISOString().slice(0, 10);
+      const existing = await cariAbsenHariIni(nama);
+      if (existing) {
+        alert('Karyawan ini sudah absen masuk hari ini.\nSilakan klik Absen Pulang jika ingin absen pulang.');
+        return;
+      }
+      const now = new Date();
+      const record = {
+        nama,
+        status,
+        keterangan: (status === 'Izin') ? keterangan : '',
+        masuk: now.toISOString(),
+        pulang: '',
+        tanggal: today
+      };
+      await simpanKeDB(record);
+      alert('Absen masuk berhasil!');
+      resetForm();
+      renderLaporan();
+    }
+
+    // Absen pulang
+    async function absenPulang() {
+      const nama = document.getElementById('nama').value.trim();
+      if (!nama) { alert('Nama wajib diisi untuk absen pulang.'); return; }
+      await bukaDB();
+      const absen = await cariAbsenHariIni(nama);
+      if (!absen) {
+        alert('Belum ada absen masuk hari ini untuk nama tersebut.');
+        return;
+      }
+      if (absen.pulang) {
+        alert('Sudah absen pulang!');
+        return;
+      }
+      const tx = db.transaction([storeName], 'readwrite');
+      const store = tx.objectStore(storeName);
+      absen.pulang = (new Date()).toISOString();
+      store.put(absen);
+      tx.oncomplete = () => {
+        alert('Absen pulang berhasil!');
+        resetForm();
+        renderLaporan();
+      };
+      tx.onerror = e => alert('Gagal absen pulang: ' + e.target.error);
+    }
+
+    function resetForm() {
+      document.getElementById('absenForm').reset();
+      document.getElementById('keteranganField').style.display = 'none';
+    }
+
+    // Simpan record ke DB
+    function simpanKeDB(record) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([storeName], 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.add(record);
+        tx.oncomplete = resolve;
+        tx.onerror = e => reject(e.target.error);
+      });
+    }
+
+    function cariAbsenHariIni(nama) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([storeName], 'readonly');
+        const store = tx.objectStore(storeName);
+        const today = (new Date()).toISOString().slice(0, 10);
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const found = req.result.find(r =>
+            r.nama.toLowerCase() === nama.toLowerCase() && r.tanggal === today
+          );
+          resolve(found);
+        };
+        req.onerror = e => reject(e.target.error);
+      });
+    }
+
+    function getAllData() {
+      return new Promise((resolve, reject) => {
+        bukaDB().then(() => {
+          const tx = db.transaction([storeName], 'readonly');
+          const store = tx.objectStore(storeName);
+          const req = store.getAll();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = e => reject(e.target.error);
+        });
+      });
+    }
+
+    // Tampilkan laporan
+    async function renderLaporan() {
+      const laporanDiv = document.getElementById('laporanBox');
+      const data = await getAllData();
+      let filterTgl = document.getElementById('filterTanggal').value;
+      let filtered = data;
+      if (filterTgl) filtered = data.filter(d => d.tanggal === filterTgl);
+
+      if (!filtered.length) {
+        laporanDiv.innerHTML = '<div style="color:#888;padding:10px 0;">Belum ada data absensi.</div>';
+        return;
+      }
+
+      let html = `<table><tr>
+        <th>No</th>
+        <th>Nama</th>
+        <th>Status</th>
+        <th>Keterangan</th>
+        <th>Absen Masuk</th>
+        <th>Absen Pulang</th>
+        <th>Durasi (jam)</th>
+        <th>Aksi</th>
+      </tr>`;
+      filtered.forEach((d, i) => {
+        html += `<tr>
+          <td>${i+1}</td>
+          <td>${escapeHtml(d.nama)}</td>
+          <td>${statusBadge(d.status)}</td>
+          <td>${escapeHtml(d.keterangan||'')}</td>
+          <td>${d.masuk ? formatWaktu(d.masuk) : '-'}</td>
+          <td>${d.pulang ? formatWaktu(d.pulang) : '-'}</td>
+          <td>${d.masuk && d.pulang ? hitungDurasi(d.masuk, d.pulang) : '-'}</td>
+          <td>
+            <button class="action-btn" title="Hapus Data" onclick="hapusData(${d.id})"><span class="material-icons" style="font-size:1.1em;">delete</span></button>
+          </td>
+        </tr>`;
+      });
+      html += '</table>';
+      laporanDiv.innerHTML = html;
+    }
+
+    function statusBadge(stat) {
+      if (stat === 'Hadir') return '<span class="status-hadir">Hadir</span>';
+      if (stat === 'Terlambat') return '<span class="status-terlambat">Terlambat</span>';
+      if (stat === 'Izin') return '<span class="status-izin">Izin</span>';
+      return stat;
+    }
+    function formatWaktu(ts) {
+      const d = new Date(ts);
+      return `${d.toLocaleDateString('id-ID')}<br>${d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+    }
+    function hitungDurasi(masuk, pulang) {
+      const ms = (new Date(pulang))-(new Date(masuk));
+      return ms > 0 ? (ms/3600000).toFixed(2) : '-';
+    }
+    function escapeHtml(str) {
+      return (str+'').replace(/[&<>"']/g, m => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[m]));
+    }
+
+    // Hapus satu data
+    function hapusData(id) {
+      if (!confirm('Hapus data absensi ini?')) return;
+      bukaDB().then(() => {
+        const tx = db.transaction([storeName], 'readwrite');
+        tx.objectStore(storeName).delete(id);
+        tx.oncomplete = renderLaporan;
+      });
+    }
+    // Hapus semua data
+    function hapusSemua() {
+      if (!confirm('Hapus SEMUA data absensi?')) return;
+      bukaDB().then(()=>{
+        const tx = db.transaction([storeName], 'readwrite');
+        tx.objectStore(storeName).clear();
+        tx.oncomplete = renderLaporan;
+      });
+    }
+
+    // Export Excel
+    async function exportExcel() {
+      const data = await getAllData();
+      if (!data.length) return alert('Data kosong!');
+      let wsData = [
+        ['No','Nama','Status','Keterangan','Absen Masuk','Absen Pulang','Durasi (jam)']
+      ];
+      data.forEach((d,i)=>{
+        wsData.push([
+          i+1, d.nama, d.status, d.keterangan||'',
+          d.masuk ? (new Date(d.masuk)).toLocaleString('id-ID') : '',
+          d.pulang ? (new Date(d.pulang)).toLocaleString('id-ID') : '',
+          d.masuk && d.pulang ? hitungDurasi(d.masuk, d.pulang) : ''
+        ]);
+      });
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, "Absensi");
+      XLSX.writeFile(wb, "Laporan_Absensi.xlsx");
+    }
+
+    // Export PDF
+    async function exportPDF() {
+      const data = await getAllData();
+      if (!data.length) return alert('Data kosong!');
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({orientation:"landscape"});
+      let rows = data.map((d,i)=>[
+        i+1, d.nama, d.status, d.keterangan||'',
+        d.masuk ? (new Date(d.masuk)).toLocaleString('id-ID') : '',
+        d.pulang ? (new Date(d.pulang)).toLocaleString('id-ID') : '',
+        d.masuk && d.pulang ? hitungDurasi(d.masuk, d.pulang) : ''
+      ]);
+      doc.text("Laporan Absensi Karyawan", 14, 14);
+      doc.autoTable({
+        head: [['No','Nama','Status','Keterangan','Absen Masuk','Absen Pulang','Durasi (jam)']],
+        body: rows,
+        startY: 20,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [60, 110, 200] }
+      });
+      doc.save("Laporan_Absensi.pdf");
+    }
+
+    // Export/import JSON
+    async function exportData() {
+      const data = await getAllData();
+      if (!data.length) return alert('Data kosong!');
+      const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'absensi-data.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!Array.isArray(data)) throw new Error('Format file salah!');
+          await bukaDB();
+          // Tambah data satu per satu
+          for (const d of data) {
+            if (d.nama && d.masuk && d.tanggal)
+              await simpanKeDB(d);
+          }
+          alert('Import berhasil!');
+          renderLaporan();
+        } catch (err) {
+          alert('Gagal import: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function resetFilterTanggal() {
+      document.getElementById('filterTanggal').value = '';
+      renderLaporan();
+    }
+
+    // Tampilkan/hidden field keterangan
+    document.getElementById('status').addEventListener('change', function() {
+      document.getElementById('keteranganField').style.display =
+        this.value === 'Izin' ? '' : 'none';
+    });
+
+    // Inisialisasi
+    bukaDB().then(renderLaporan);
+  </script>
+</body>
+</html>
