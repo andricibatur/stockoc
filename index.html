@@ -1,303 +1,317 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Aplikasi Barang - Export/Import/Backup GitHub & Google Sheets</title>
+  <meta charset="UTF-8">
+  <title>Aplikasi Kode Barang Masuk/Keluar</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 2em; background: #f7f7f7; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 1em; background: #fff; }
-    th, td { border: 1px solid #ccc; padding: 8px 12px; }
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    textarea, input, button, select { margin: 0.5em 0; }
+    .container { margin-bottom: 2em; }
+    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 6px 12px; }
     th { background: #eee; }
-    input, button, select { padding: 6px 10px; margin: 4px 0; }
-    .actions button { margin-right: 4px; }
-    .import-export { margin: 1em 0; }
-    .github-backup { background: #e6f0ff; padding: 1em; border-radius: 6px; margin-bottom: 1em; border: 1px solid #b3d1ff }
-    .github-backup label { display: block; margin: 3px 0 2px 0; }
-    .github-backup input { width: 350px; max-width: 100%; }
-    .github-backup small { font-size: 12px; color: #888; }
-    .sheetdb-box { background: #e6ffe6; padding: 1em; margin-bottom: 1em; border: 1px solid #b3ffb3; border-radius: 6px; }
-    .sheetdb-box span { font-size: 13px; color: #222; }
+    .filter-group { margin-bottom: 1em; }
+    .filter-inline > * { margin-right: 0.5em; }
   </style>
 </head>
 <body>
-<h2>Manajemen Data Barang</h2>
+  <h2>Aplikasi Kode Barang (Input/Output)</h2>
 
-<!-- Fitur SheetDB -->
-<div class="sheetdb-box">
-  <b>Sync ke Google Sheets (via SheetDB API)</b><br>
-  <button onclick="syncToSheetDB()">Sync ke Google Sheets</button>
-  <button onclick="fetchFromSheetDB()">Ambil Data dari Google Sheets</button>
-  <span id="sheetdbStatus"></span>
-</div>
+  <div class="container">
+    <label>Input Kode Barang Masuk:</label><br>
+    <textarea id="kodeMasuk" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
+    <button onclick="simpanMasuk()">Simpan Masuk</button>
+  </div>
 
-<!-- FORM BACKUP GITHUB -->
-<div class="github-backup">
-  <b>Backup ke GitHub</b> <br>
-  <label>
-    Personal Access Token:
-    <input type="password" id="githubToken" placeholder="ghp_xxx...">
-    <small>(Buat di: <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings</a> &mdash; scope: <b>repo</b>)</small>
-  </label>
-  <label>
-    Owner / Repo:
-    <input type="text" id="githubRepo" placeholder="username/repo" value="">
-  </label>
-  <label>
-    Path file di repo:
-    <input type="text" id="githubFilePath" placeholder="data-barang.json" value="data-barang.json">
-  </label>
-  <button onclick="backupToGitHub()">Backup ke GitHub</button>
-  <span id="githubStatus"></span>
-</div>
+  <div class="container">
+    <label>Input Kode Barang Keluar:</label><br>
+    <textarea id="kodeKeluar" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
+    <button onclick="simpanKeluar()">Simpan Keluar</button>
+  </div>
 
-<form id="barangForm">
-  <input type="hidden" id="editIndex" value="">
-  <input type="text" id="nama" placeholder="Nama Barang" required />
-  <input type="number" id="jumlah" placeholder="Jumlah" required min="1"/>
-  <button type="submit" id="submitBtn">Tambah</button>
-  <button type="button" id="cancelEdit" style="display:none;">Batal Edit</button>
-</form>
+  <div class="container filter-group">
+    <div class="filter-inline">
+      <label>Filter: </label>
+      <select id="filterMode" onchange="onFilterChange()">
+        <option value="semua">Semua</option>
+        <option value="harian">Harian</option>
+        <option value="mingguan">Mingguan</option>
+        <option value="terbanyak">Terbanyak</option>
+        <option value="tidaklaku">Tidak Laku</option>
+      </select>
+      <input type="date" id="filterDate" style="display:none" onchange="tampilkanLaporan()" />
+      <button onclick="tampilkanLaporan()">Terapkan Filter</button>
+      <button onclick="exportCSV()">Export CSV</button>
+      <button onclick="syncToSheetDB()">Sinkron ke Google Sheet</button>
+    </div>
+  </div>
 
-<div class="import-export">
-  <button onclick="exportJSON()">Export JSON</button>
-  <label style="margin-left:1em; cursor:pointer;">
-    Import JSON
-    <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="importJSON(event)">
-  </label>
-</div>
+  <div class="container">
+    <button onclick="tampilkanLaporan()">Tampilkan Laporan</button>
+    <button onclick="exportData()">Export Data (JSON)</button>
+    <input type="file" id="importFile" style="display:none" onchange="importData(event)"/>
+    <button onclick="document.getElementById('importFile').click()">Import Data (JSON)</button>
+  </div>
 
-<table id="dataTable">
-  <thead>
-    <tr>
-      <th>#</th>
-      <th>Nama Barang</th>
-      <th>Jumlah</th>
-      <th>Aksi</th>
-    </tr>
-  </thead>
-  <tbody>
-  </tbody>
-</table>
+  <div class="container">
+    <h3>Laporan Barang</h3>
+    <div id="laporan"></div>
+  </div>
 
-<script>
-const STORAGE_KEY = 'barangDataV1';
-let data = [];
-const SHEETDB_API = "https://sheetdb.io/api/v1/8l3pk21z7kq20";
+  <script>
+    // IndexedDB Setup
+    const dbName = 'AplikasiBarang';
+    const masukStore = 'masuk';
+    const keluarStore = 'keluar';
+    let db;
+    let lastReportData = []; // untuk export CSV dan sync Google Sheet
 
-// ---- SheetDB Integration ----
-// Sinkronisasi: kirim data ke Google Sheets (replace semua data lama)
-async function syncToSheetDB() {
-  const status = document.getElementById("sheetdbStatus");
-  status.textContent = "Menyimpan ke Google Sheets...";
-  status.style.color = "#222";
-  try {
-    // 1. Reset/hapus semua data lama
-    await fetch(SHEETDB_API + "/all", { method:"DELETE" });
-    // 2. POST data baru (format: {data: [ {nama:..., jumlah:...}, ... ]})
-    const dataToSend = data.map(row => ({
-      nama: row.nama,
-      jumlah: row.jumlah
-    }));
-    const res = await fetch(SHEETDB_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: dataToSend })
-    });
-    if(res.ok) {
-      status.textContent = "Berhasil sync ke Google Sheets!";
-      status.style.color = "green";
-    } else {
-      status.textContent = "Gagal sync! Cek SheetDB API.";
-      status.style.color = "red";
+    // SheetDB API Endpoint
+    const SHEETDB_API = 'https://sheetdb.io/api/v1/8l3pk21z7kq20';
+
+    function bukaDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(dbName, 2);
+        req.onupgradeneeded = e => {
+          db = e.target.result;
+          if (!db.objectStoreNames.contains(masukStore)) {
+            db.createObjectStore(masukStore, { keyPath: 'id', autoIncrement: true });
+          }
+          if (!db.objectStoreNames.contains(keluarStore)) {
+            db.createObjectStore(keluarStore, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = e => { db = e.target.result; resolve(db); };
+        req.onerror = e => reject(e.target.error);
+      });
     }
-  } catch (e) {
-    status.textContent = "Gagal koneksi ke API SheetDB!";
-    status.style.color = "red";
-  }
-}
 
-// Ambil data dari Google Sheets via SheetDB
-async function fetchFromSheetDB() {
-  const status = document.getElementById("sheetdbStatus");
-  status.textContent = "Mengambil data dari Google Sheets...";
-  status.style.color = "#222";
-  try {
-    const res = await fetch(SHEETDB_API);
-    if(res.ok) {
-      const sheetData = await res.json();
-      if(Array.isArray(sheetData)) {
-        data = sheetData.map(row => ({
-          nama: row.nama || "",
-          jumlah: Number(row.jumlah || 0)
-        }));
-        saveData();
-        renderTable();
-        status.textContent = "Data berhasil diambil dari Google Sheets!";
-        status.style.color = "green";
-      } else {
-        status.textContent = "Data tidak valid dari SheetDB.";
-        status.style.color = "red";
+    function simpanKeStore(storeName, kodeList) {
+      return bukaDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([storeName], 'readwrite');
+          const store = tx.objectStore(storeName);
+          const now = new Date();
+          kodeList.forEach(kode => {
+            store.add({ kode: kode.trim(), waktu: now.toISOString() });
+          });
+          tx.oncomplete = resolve;
+          tx.onerror = e => reject(e.target.error);
+        });
+      });
+    }
+
+    function simpanMasuk() {
+      const raw = document.getElementById('kodeMasuk').value.trim();
+      if (!raw) return alert('Input kode barang masuk kosong!');
+      const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
+      simpanKeStore(masukStore, kodeList).then(() => {
+        alert('Berhasil disimpan!');
+        document.getElementById('kodeMasuk').value = '';
+      });
+    }
+
+    function simpanKeluar() {
+      const raw = document.getElementById('kodeKeluar').value.trim();
+      if (!raw) return alert('Input kode barang keluar kosong!');
+      const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
+      simpanKeStore(keluarStore, kodeList).then(() => {
+        alert('Berhasil disimpan!');
+        document.getElementById('kodeKeluar').value = '';
+      });
+    }
+
+    function ambilSemua(storeName) {
+      return bukaDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([storeName], 'readonly');
+          const store = tx.objectStore(storeName);
+          const req = store.getAll();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = e => reject(e.target.error);
+        });
+      });
+    }
+
+    function filterByDate(data, tanggal, rentangHari = 1) {
+      // tanggal format yyyy-mm-dd
+      const dateObj = new Date(tanggal);
+      let start = new Date(dateObj.setHours(0,0,0,0));
+      let end = new Date(start);
+      end.setDate(end.getDate() + rentangHari);
+      return data.filter(item => {
+        const t = new Date(item.waktu);
+        return t >= start && t < end;
+      });
+    }
+
+    function onFilterChange() {
+      const mode = document.getElementById('filterMode').value;
+      document.getElementById('filterDate').style.display = (mode === 'harian' || mode === 'mingguan') ? '' : 'none';
+    }
+
+    async function tampilkanLaporan() {
+      const masuk = await ambilSemua(masukStore);
+      const keluar = await ambilSemua(keluarStore);
+      const filterMode = document.getElementById('filterMode').value;
+      const filterDate = document.getElementById('filterDate').value;
+      let masukFiltered = masuk, keluarFiltered = keluar;
+
+      // FILTER DATA
+      if (filterMode === 'harian' && filterDate) {
+        masukFiltered = filterByDate(masuk, filterDate, 1);
+        keluarFiltered = filterByDate(keluar, filterDate, 1);
+      } else if (filterMode === 'mingguan' && filterDate) {
+        masukFiltered = filterByDate(masuk, filterDate, 7);
+        keluarFiltered = filterByDate(keluar, filterDate, 7);
       }
-    } else {
-      status.textContent = "Gagal mengambil data!";
-      status.style.color = "red";
-    }
-  } catch(e) {
-    status.textContent = "Gagal koneksi ke API SheetDB!";
-    status.style.color = "red";
-  }
-}
 
-function loadData() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  data = raw ? JSON.parse(raw) : [];
-}
-function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-function renderTable() {
-  const tbody = document.querySelector("#dataTable tbody");
-  tbody.innerHTML = '';
-  data.forEach((row, idx) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${idx+1}</td>
-      <td>${row.nama}</td>
-      <td>${row.jumlah}</td>
-      <td class="actions">
-        <button onclick="startEdit(${idx})">Edit</button>
-        <button onclick="deleteRow(${idx})">Hapus</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-document.getElementById('barangForm').onsubmit = function(e) {
-  e.preventDefault();
-  const nama = document.getElementById('nama').value.trim();
-  const jumlah = parseInt(document.getElementById('jumlah').value);
-  const editIdx = document.getElementById('editIndex').value;
-  if(editIdx === "") {
-    data.push({nama, jumlah});
-  } else {
-    data[editIdx] = {nama, jumlah};
-  }
-  saveData();
-  renderTable();
-  this.reset();
-  document.getElementById('cancelEdit').style.display = "none";
-  document.getElementById('submitBtn').innerText = "Tambah";
-  document.getElementById('editIndex').value = "";
-};
-function startEdit(idx) {
-  document.getElementById('nama').value = data[idx].nama;
-  document.getElementById('jumlah').value = data[idx].jumlah;
-  document.getElementById('editIndex').value = idx;
-  document.getElementById('submitBtn').innerText = "Simpan";
-  document.getElementById('cancelEdit').style.display = "inline";
-}
-document.getElementById('cancelEdit').onclick = function() {
-  document.getElementById('barangForm').reset();
-  document.getElementById('submitBtn').innerText = "Tambah";
-  document.getElementById('editIndex').value = "";
-  this.style.display = "none";
-};
-function deleteRow(idx) {
-  if(confirm("Hapus data ini?")) {
-    data.splice(idx, 1);
-    saveData();
-    renderTable();
-  }
-}
-function exportJSON() {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = "data-barang.json";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-function importJSON(ev) {
-  const file = ev.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const imported = JSON.parse(e.target.result);
-      if(Array.isArray(imported)) {
-        data = imported;
-        saveData();
-        renderTable();
-        alert("Import berhasil!");
-      } else {
-        alert("File tidak valid.");
+      // Hitung masuk per kode
+      const masukCount = {};
+      for (const { kode } of masukFiltered) {
+        if (!masukCount[kode]) masukCount[kode] = 0;
+        masukCount[kode]++;
       }
-    } catch {
-      alert("File tidak valid.");
-    }
-  };
-  reader.readAsText(file);
-}
+      // Hitung keluar per kode
+      const keluarCount = {};
+      for (const { kode } of keluarFiltered) {
+        if (!keluarCount[kode]) keluarCount[kode] = 0;
+        keluarCount[kode]++;
+      }
+      const semuaKode = Array.from(new Set([...Object.keys(masukCount), ...Object.keys(keluarCount)]));
 
-// --- GITHUB BACKUP FITUR ---
-async function backupToGitHub() {
-  const token = document.getElementById("githubToken").value.trim();
-  const repo = document.getElementById("githubRepo").value.trim();
-  const filePath = document.getElementById("githubFilePath").value.trim();
-  const status = document.getElementById("githubStatus");
-  if(!token || !repo || !filePath) {
-    status.textContent = "Isi semua data GitHub!";
-    status.style.color = "red";
-    return;
-  }
-  status.textContent = "Mengecek file...";
-  status.style.color = "#333";
-  // Langkah 1: cek apakah file sudah ada (fetch sha)
-  let sha = undefined;
-  try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
-      headers: { Authorization: `token ${token}` }
-    });
-    if(res.status === 200) {
-      const json = await res.json();
-      sha = json.sha;
-    }
-  } catch {}
-  // Langkah 2: push file (PUT)
-  status.textContent = "Backup ke GitHub...";
-  const body = {
-    message: `Backup data barang (${new Date().toISOString()})`,
-    content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)))),
-    sha: sha
-  };
-  try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
-      method: "PUT",
-      headers: {
-        Authorization: `token ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
-    });
-    if(res.status === 201 || res.status === 200) {
-      status.textContent = "Berhasil backup ke GitHub!";
-      status.style.color = "green";
-    } else {
-      const err = await res.json();
-      status.textContent = "Gagal: " + (err && err.message ? err.message : res.status);
-      status.style.color = "red";
-    }
-  } catch (e) {
-    status.textContent = "Error koneksi atau token salah!";
-    status.style.color = "red";
-  }
-}
+      // Gabung data
+      let dataReport = semuaKode.map(kode => ({
+        kode,
+        masuk: masukCount[kode] || 0,
+        keluar: keluarCount[kode] || 0,
+        sisa: (masukCount[kode] || 0) - (keluarCount[kode] || 0)
+      }));
 
-// --- Init ---
-loadData();
-renderTable();
-</script>
+      // Filter tambahan
+      if (filterMode === 'terbanyak') {
+        dataReport = dataReport.sort((a, b) => b.sisa - a.sisa).slice(0, 10);
+      }
+      if (filterMode === 'tidaklaku') {
+        dataReport = dataReport.filter(d => d.sisa <= 0);
+      }
+
+      // Tabel HTML
+      let html = '<table><tr><th>Kode Barang</th><th>Masuk</th><th>Keluar</th><th>Sisa</th></tr>';
+      dataReport.forEach(row => {
+        html += `<tr><td>${row.kode}</td><td>${row.masuk}</td><td>${row.keluar}</td><td>${row.sisa}</td></tr>`;
+      });
+      html += '</table>';
+      document.getElementById('laporan').innerHTML = html;
+      lastReportData = dataReport; // simpan untuk export csv dan sync Google Sheet
+    }
+
+    // Export/import JSON
+    async function exportData() {
+      const masuk = await ambilSemua(masukStore);
+      const keluar = await ambilSemua(keluarStore);
+      const jsonData = JSON.stringify({ masuk, keluar }, null, 2);
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'data-barang.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.masuk || !data.keluar) throw new Error('Format file salah!');
+          await bukaDB();
+          await hapusSemua(masukStore);
+          await hapusSemua(keluarStore);
+          await simpanBatch(masukStore, data.masuk);
+          await simpanBatch(keluarStore, data.keluar);
+          alert('Import berhasil!');
+        } catch (err) {
+          alert('Gagal import: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function hapusSemua(storeName) {
+      return bukaDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([storeName], 'readwrite');
+          const store = tx.objectStore(storeName);
+          store.clear();
+          tx.oncomplete = resolve;
+          tx.onerror = e => reject(e.target.error);
+        });
+      });
+    }
+
+    function simpanBatch(storeName, dataArr) {
+      return bukaDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction([storeName], 'readwrite');
+          const store = tx.objectStore(storeName);
+          dataArr.forEach(data => {
+            store.add({ kode: data.kode, waktu: data.waktu });
+          });
+          tx.oncomplete = resolve;
+          tx.onerror = e => reject(e.target.error);
+        });
+      });
+    }
+
+    // Export CSV
+    function exportCSV() {
+      if (!lastReportData.length) {
+        alert('Tampilkan laporan dulu sebelum ekspor CSV!');
+        return;
+      }
+      let csv = "Kode Barang,Masuk,Keluar,Sisa\n";
+      lastReportData.forEach(row => {
+        csv += `"${row.kode}",${row.masuk},${row.keluar},${row.sisa}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'laporan-barang.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Sinkronisasi ke Google Sheet via SheetDB API
+    function syncToSheetDB() {
+      if (!lastReportData.length) {
+        alert('Tampilkan laporan dulu sebelum sinkron!');
+        return;
+      }
+      // SheetDB menerima format: { data: [ {kode:..., masuk:..., keluar:..., sisa:...}, ... ] }
+      fetch(SHEETDB_API + "?sheet=Sheet1", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ data: lastReportData })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.created) {
+          alert('Sinkronisasi ke Google SheetDB berhasil!');
+        } else {
+          alert('Sinkron ke Google SheetDB GAGAL! (Cek format sheetnya)');
+        }
+      })
+      .catch(e => alert('Gagal sinkron ke Google SheetDB: ' + e));
+    }
+
+    // Inisialisasi
+    bukaDB();
+    document.getElementById('filterMode').addEventListener('change', onFilterChange);
+  </script>
 </body>
 </html>
