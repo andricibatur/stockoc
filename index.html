@@ -1,85 +1,127 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deadline Tracker</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <title>Dashboard Office OC</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body {
+      background: linear-gradient(120deg, #f0f7fa 0%, #e8eaf6 100%);
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 430px;
+      margin: 40px auto 0 auto;
+      padding: 32px 30px 24px 30px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(60,60,90,0.13), 0 1.5px 4px rgba(0,0,0,0.07);
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.1rem;
+      letter-spacing: 0.02em;
+      color: #364f6b;
+      margin-bottom: 26px;
+      margin-top: 0;
+    }
+    .menu-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px 18px;
+      margin: 0 auto 20px auto;
+      justify-content: center;
+    }
+    .menu-item {
+      background: linear-gradient(100deg, #e0e7ff 0%, #f4f7fe 100%);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(90,90,140,0.09);
+      padding: 24px 6px 18px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      border: none;
+      transition: transform .14s, box-shadow .12s;
+      font-size: 1.06rem;
+      color: #283350;
+      text-decoration: none;
+    }
+    .menu-item:active, .menu-item:focus {
+      transform: scale(0.98);
+      box-shadow: 0 0px 0px rgba(0,0,0,0.01);
+    }
+    .menu-icon {
+      font-size: 2.4rem;
+      margin-bottom: 8px;
+      color: #5873c0;
+      filter: drop-shadow(0 1px 2px #b0c4e7);
+      transition: color .2s;
+    }
+    .menu-item:hover .menu-icon {
+      color: #2e5aaf;
+    }
+    .footer {
+      margin-top: 16px;
+      color: #999;
+      font-size: 0.97rem;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+    @media (max-width: 540px) {
+      .container { max-width: 95%; padding: 20px 4vw 14px 4vw; }
+      .menu-grid { gap: 13px 7px; }
+      h1 { font-size: 1.3rem; }
+      .menu-item { font-size: .97rem; padding: 16px 2px 10px 2px; }
+    }
+    /* Style for full-row menu (Jadwal) */
+    .menu-grid .menu-item.fullrow {
+      grid-column: span 2;
+      padding-top: 18px;
+      padding-bottom: 14px;
+    }
+  </style>
+  <!-- Using Google Fonts for a clean modern look -->
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Using Material Icons for icons -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
 </head>
 <body>
-    <p>Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): <span id="currentDateTime">2025-05-21 03:51:01</span></p>
-    <p>Current User's Login: andricibatur</p>
-
-    <h1>Deadline Tracker</h1>
-    
-    <div class="section">
-        <h2>Add New Deadline</h2>
-        <form id="deadlineForm">
-            <label for="timestamp">Timestamp:</label>
-            <input type="datetime-local" id="timestamp" required><br><br>
-            
-            <label for="description">Description:</label>
-            <input type="text" id="description" required><br><br>
-            
-            <label for="startTime">Start Time:</label>
-            <input type="datetime-local" id="startTime" required><br><br>
-            
-            <label for="endTime">End Time:</label>
-            <input type="datetime-local" id="endTime" required><br><br>
-            
-            <label for="bonus">Bonus:</label>
-            <input type="number" id="bonus" value="0"><br><br>
-            
-            <button type="submit">Add Deadline</button>
-        </form>
+  <div class="container">
+    <h2>Menu Utama Data OC</h></h1>
+    <div class="menu-grid">
+      <a href="inputgudang.html" class="menu-item" tabindex="1">
+        <span class="menu-icon material-icons">inventory_2</span>
+        Barcode Keluar Masuk Barang
+      </a>
+      <a href="kirim-barang.html" class="menu-item" tabindex="2">
+        <span class="menu-icon material-icons">local_shipping</span>
+        Input Kirim Barang
+      </a>
+      <a href="cod-retur.html" class="menu-item" tabindex="3">
+        <span class="menu-icon material-icons">assignment_return</span>
+        COD Retur
+      </a>
+      <a href="absensi.html" class="menu-item" tabindex="4">
+        <span class="menu-icon material-icons">how_to_reg</span>
+        Absensi
+      </a>
+      
+      <a href="jadwal.html" class="menu-item fullrow" tabindex="5">
+        <span class="menu-icon material-icons">event_note</span>
+        Jadwal
+      </a>
+      <a href="bcg.html" class="menu-item" tabindex="6">
+        <span class="menu-icon material-icons">barcode</span>
+        Print Barcode
+      </a>
     </div>
-    
-    <div class="section">
-        <h2>Deadlines</h2>
-        <table id="deadlineTable">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Description</th>
-                    <th>Start Time</th>
-                    <th>End Time</th>
-                    <th>Bonus</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Deadlines will be rendered here -->
-            </tbody>
-        </table>
+    <div class="footer">
+      &copy; 2025 Aplikasi Gudang | Dashboard Menu
     </div>
-    
-    <div class="section">
-        <h2>Completed Report</h2>
-        <table id="reportTable">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Description</th>
-                    <th>Start Time</th>
-                    <th>End Time</th>
-                    <th>Bonus</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Completed deadlines will be rendered here -->
-            </tbody>
-        </table>
-        <div class="total-bonus">Total Bonus: <span id="totalBonus">0</span></div>
-    </div>
-    
-    <div class="export-import">
-        <button onclick="exportData()">Export Data</button>
-        <input type="file" id="importFile" accept=".json">
-        <button onclick="importData()">Import Data</button>
-    </div>
-
-    <script src="db.js"></script>
-    <script src="utils.js"></script>
-    <script src="app.js"></script>
+  </div>
 </body>
 </html>
