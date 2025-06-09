@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mindmap Lanjutan</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    #mindmap {
+      width: 800px; height: 600px;
+      margin: 20px auto; border: 1px solid #ccc;
+      position: relative; background: #fafafa;
+    }
+    .node {
+      position: absolute;
+      width: 120px; min-height: 60px;
+      border-radius: 10px; padding: 5px;
+      color: #000; cursor: move;
+      box-shadow: 0 0 5px #999;
+      user-select: none;
+    }
+    .blink { animation: blink 1s infinite; }
+    @keyframes blink {
+      0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; }
+    }
+    canvas {
+      position: absolute;
+      top: 0; left: 0; z-index: 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>Mindmap Lanjutan</h2>
+  <div>
+    <input id="desc" placeholder="Keterangan">
+    <input id="date" type="date">
+    <button onclick="addNode(null)">Tambah Utama</button>
+    <button onclick="exportJSON()">Export</button>
+    <input type="file" onchange="importJSON(event)">
+  </div>
+  <div id="mindmap">
+    <canvas id="lines"></canvas>
+  </div>
+  <button onclick="showDeletedNodes()">Laporan</button>
+  <div id="laporan"></div>
+
+  <script>
+    let db, dbName = "MindmapAdv", storeName = "nodes";
+    const container = document.getElementById("mindmap");
+    const canvas = document.getElementById("lines");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = container.offsetWidth;
+    canvas.height = container.offsetHeight;
+
+    function openDB() {
+      const request = indexedDB.open(dbName, 1);
+
+      request.onupgradeneeded = e => {
+        db = e.target.result;
+        db.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
+        db.createObjectStore("deletedNodes", { keyPath: "id" });
+      };
+
+      request.onsuccess = e => {
+        db = e.target.result;
+        loadNodes();
+      };
+    }
+
+    function randColor() {
+      return `hsl(${Math.random() * 360}, 80%, 85%)`;
+    }
+
+    function addNode(parentId) {
+      const desc = document.getElementById("desc").value;
+      const date = document.getElementById("date").value;
+      if (!desc || !date) return alert("Lengkapi keterangan dan tanggal");
+
+      const node = {
+        desc, date,
+        color: randColor(),
+        parentId,
+        x: Math.random() * 600 + 50,
+        y: Math.random() * 400 + 50
+      };
+
+      const tx = db.transaction(storeName, "readwrite");
+      tx.objectStore(storeName).add(node);
+      tx.oncomplete = loadNodes;
+    }
+
+    function deleteNode(id) {
+      const tx = db.transaction([storeName, "deletedNodes"], "readwrite");
+      const mainStore = tx.objectStore(storeName);
+      const delStore = tx.objectStore("deletedNodes");
+
+      mainStore.get(id).onsuccess = e => {
+        const node = e.target.result;
+        if (node) {
+          delStore.put({ ...node, deletedAt: new Date().toISOString() });
+          mainStore.delete(id);
+        }
+      };
+
+      tx.oncomplete = loadNodes;
+    }
+
+    function loadNodes() {
+      const tx = db.transaction(storeName, "readonly");
+      const store = tx.objectStore(storeName);
+      store.getAll().onsuccess = e => {
+        const nodes = arrangeNodes(e.target.result);
+        drawNodes(nodes);
+      };
+    }
+
+    function arrangeNodes(nodes) {
+      const maxCols = 6;
+      const spacingX = 140, spacingY = 90;
+      nodes.forEach((node, index) => {
+        const col = index % maxCols;
+        const row = Math.floor(index / maxCols);
+        node.x = 90 + col * spacingX;
+        node.y = 90 + row * spacingY;
+      });
+      return nodes;
+    }
+
+    function drawNodes(nodes) {
+      container.querySelectorAll(".node").forEach(n => n.remove());
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      nodes.forEach(n => {
+        if (n.parentId != null) {
+          const parent = nodes.find(p => p.id === n.parentId);
+          if (parent) {
+            ctx.beginPath();
+            ctx.moveTo(parent.x + 60, parent.y + 30);
+            ctx.lineTo(n.x + 60, n.y + 30);
+            ctx.strokeStyle = "#888";
+            ctx.stroke();
+          }
+        }
+      });
+
+      const today = new Date().toISOString().split("T")[0];
+      nodes.forEach(n => {
+        const div = document.createElement("div");
+        div.className = "node";
+        div.style.left = n.x + "px";
+        div.style.top = n.y + "px";
+        div.style.background = n.color;
+        if (n.date === today) div.classList.add("blink");
+
+        div.innerHTML = `
+          <b>${n.desc}</b><br><small>${n.date}</small><br>
+          <button onclick="deleteNode(${n.id})">X</button>
+        `;
+
+        div.onmousedown = e => startDrag(e, div, n);
+        div.oncontextmenu = e => { e.preventDefault(); addSubNodePrompt(n.id); };
+        div.ondblclick = () => {
+          const newDesc = prompt("Edit keterangan:", n.desc);
+          const newDate = prompt("Edit tanggal (YYYY-MM-DD):", n.date);
+          if (newDesc && newDate) {
+            n.desc = newDesc;
+            n.date = newDate;
+            const tx = db.transaction(storeName, "readwrite");
+            tx.objectStore(storeName).put(n);
+            tx.oncomplete = loadNodes;
+          }
+        };
+
+        container.appendChild(div);
+      });
+    }
+
+    function startDrag(e, div, node) {
+      const offsetX = e.offsetX, offsetY = e.offsetY;
+      const onMove = ev => {
+        node.x = ev.pageX - container.offsetLeft - offsetX;
+        node.y = ev.pageY - container.offsetTop - offsetY;
+        div.style.left = node.x + "px";
+        div.style.top = node.y + "px";
+        drawLines();
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).put(node);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    }
+
+    function drawLines() {
+      const tx = db.transaction(storeName, "readonly");
+      tx.objectStore(storeName).getAll().onsuccess = e => drawNodes(e.target.result);
+    }
+
+    function addSubNodePrompt(parentId) {
+      const desc = prompt("Sub-node keterangan:");
+      const date = prompt("Tanggal (YYYY-MM-DD):");
+      if (!desc || !date) return;
+      const tx = db.transaction(storeName, "readwrite");
+      tx.objectStore(storeName).add({
+        desc, date, color: randColor(),
+        parentId, x: Math.random() * 500, y: Math.random() * 400
+      });
+      tx.oncomplete = loadNodes;
+    }
+
+    function exportJSON() {
+      const tx = db.transaction(storeName, "readonly");
+      tx.objectStore(storeName).getAll().onsuccess = e => {
+        const data = e.target.result;
+        const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "mindmap.json";
+        a.click();
+      };
+    }
+
+    function importJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const items = JSON.parse(reader.result);
+        const tx = db.transaction(storeName, "readwrite");
+        const store = tx.objectStore(storeName);
+        items.forEach(item => { delete item.id; store.add(item); });
+        tx.oncomplete = loadNodes;
+      };
+      reader.readAsText(file);
+    }
+
+    function showDeletedNodes() {
+      const tx = db.transaction("deletedNodes", "readonly");
+      tx.objectStore("deletedNodes").getAll().onsuccess = e => {
+        const laporan = document.getElementById("laporan");
+        laporan.innerHTML = "<h3>Riwayat Node Dihapus</h3>";
+        e.target.result.forEach(n => {
+          laporan.innerHTML += `
+            <div style="border:1px solid #ccc; margin:5px; padding:5px;">
+              <b>${n.desc}</b> | Tgl: ${n.date}<br>
+              Dihapus: ${new Date(n.deletedAt).toLocaleString()}
+            </div>`;
+        });
+      };
+    }
+
+    openDB();
+  </script>
+</body>
+</html>
