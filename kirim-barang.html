@@ -2,445 +2,295 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Kirim Barang - Modul Gudang</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <!-- Google Fonts & Material Icons -->
-  <link href="https://fonts.googleapis.com/css?family=Roboto:400,500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <title>Track Pengiriman</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: 'Roboto', Arial, sans-serif;
-      background: linear-gradient(120deg,#e0e7fa 0%, #e8f0fe 100%);
-      margin: 0;
-      min-height: 100vh;
+    body { font-family: sans-serif; padding: 1rem; }
+    textarea { width: 100%; height: 80px; margin-bottom: 1rem; }
+    input, select, button { margin: 0.25rem 0; display: block; width: 100%; padding: 0.5rem; }
+    
+    /* Grid container untuk node */
+    .nodes-grid {
+      display: grid;
+      grid-template-columns: repeat(14, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 1rem;
     }
-    .container {
-      max-width: 430px;
-      margin: 34px auto 0 auto;
-      background: #fff;
-      border-radius: 18px;
-      box-shadow: 0 6px 24px rgba(60,60,90,0.10), 0 1.5px 4px rgba(0,0,0,0.08);
-      padding: 28px 24px 20px 24px;
-      text-align: center;
-    }
-    h1 {
-      font-size: 2.0rem;
-      color: #324e6f;
-      margin-bottom: 6px;
-      margin-top: 0;
-    }
-    .desc {
-      color: #6b7a89;
-      font-size: 1.05rem;
-      margin-bottom: 20px;
-    }
-    .form-group {
-      margin-bottom: 1.2em;
-      text-align: left;
-    }
-    label {
-      font-size: 1.08rem;
-      color: #374151;
-      margin-bottom: 4px;
-      display: block;
-    }
-    input[type="text"], input[type="file"] {
-      font-size: 1rem;
-      padding: 8px 10px;
-      border-radius: 8px;
-      border: 1px solid #b7c3dd;
-      width: 96%;
-      margin-top: 3px;
-      margin-bottom: 9px;
-      outline: none;
-      transition: border .13s;
-      background: #f7fafd;
-    }
-    input[type="text"]:focus {
-      border: 1.5px solid #607fdc;
-    }
-    .barcode-btn {
-      background: #e0eaff;
-      border: 1px solid #b6d2fa;
-      color: #2c58a4;
-      border-radius: 7px;
-      padding: 8px 18px;
-      font-size: 1.01rem;
-      margin-top: 8px;
-      margin-left: 0.5em;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background .16s;
-      outline: none;
-    }
-    .barcode-btn:hover {
-      background: #c8dfff;
-    }
-    .btn {
-      background: linear-gradient(90deg, #e3f0ff 0%, #c6dafc 100%);
-      color: #2957a4;
-      border: 1px solid #b6d2fa;
-      border-radius: 7px;
-      padding: 11px 26px;
-      font-size: 1.05rem;
-      font-family: inherit;
-      font-weight: 500;
-      cursor: pointer;
-      box-shadow: 0 2px 7px rgba(100,130,180,0.07);
-      transition: background 0.18s, color 0.18s;
-      outline: none;
-      margin: 0 0.5em 0.8em 0;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-    }
-    .btn:active, .btn:focus {
-      background: linear-gradient(90deg, #d0e5ff 0%, #a7c7f7 100%);
-      color: #183d73;
-    }
-    .photo-preview {
-      width: 96px;
-      height: 96px;
-      margin-top: 6px;
-      margin-bottom: 8px;
-      border-radius: 10px;
-      background: #e9f3ff;
-      object-fit: cover;
-      border: 1px solid #c0d6ef;
-      display: none;
-    }
-    .laporan-box {
-      background: #f6fbff;
-      border-radius: 12px;
-      margin: 18px 0 0 0;
-      padding: 10px 3px 14px 3px;
-      box-shadow: 0 2px 6px rgba(80,120,200,.05);
-      max-width: 100%;
-      overflow-x: auto;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      font-size: 1rem;
-      margin: 0;
-    }
-    th, td {
-      border: 1px solid #c5d0e8;
-      padding: 7px 10px;
-      text-align: center;
-      vertical-align: middle;
-    }
-    th {
-      background: #e3eafc;
-      color: #3857a4;
-      font-weight: 500;
-    }
-    tr:nth-child(even) td {
-      background: #f8fafc;
-    }
-    .photo-thumb {
-      width: 46px;
-      height: 46px;
-      border-radius: 7px;
-      object-fit: cover;
-      border: 1px solid #c0d6ef;
-    }
-    .aksi-btn {
-      font-size: 1.1rem;
-      color: #3857a4;
-      background: none;
-      border: none;
-      cursor: pointer;
-      margin: 0 2px;
-      padding: 2px 5px;
-      border-radius: 6px;
-      transition: background .14s;
-    }
-    .aksi-btn:hover {
-      background: #e0e7ff;
-    }
-    .export-group {
-      margin-top: 13px;
+    
+    .node {
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
       display: flex;
+      flex-direction: column;
+      align-items: center;
       justify-content: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 6px;
-    }
-    .footer {
-      margin-top: 15px;
-      color: #888;
-      font-size: 0.97rem;
+      font-size: 0.7rem;
       text-align: center;
-      letter-spacing: 0.02em;
+      background: #ccffcc;
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+      transition: all 0.3s;
+      min-height: 60px;
+      word-break: break-word;
+      overflow: hidden;
     }
-    @media (max-width: 540px) {
-      .container { max-width: 99vw; padding: 13px 2vw 10px 2vw; }
-      h1 { font-size: 1.15rem; }
-      .btn, .barcode-btn { padding: 8px 10px; font-size: .96rem; }
-      th, td { padding: 5px 5px; font-size: .96rem; }
-      .photo-preview { width: 68px; height: 68px; }
-      .photo-thumb { width: 32px; height: 32px; }
+    
+    .node select {
+      width: 100%;
+      font-size: 0.6rem;
+      margin-top: 4px;
+      padding: 2px;
     }
+    
+    .blink-yellow { animation: blinkYellow 1s infinite; }
+    .blink-red { animation: blinkRed 1s infinite; }
+    @keyframes blinkYellow {
+      0%, 100% { background-color: #ccffcc; }
+      50% { background-color: #ffff99; }
+    }
+    @keyframes blinkRed {
+      0%, 100% { background-color: #ccffcc; }
+      50% { background-color: #ff9999; }
+    }
+    
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+    th { background: #eee; }
+    .hapus { color: red; cursor: pointer; }
   </style>
-  <!-- SheetJS for Excel Export -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1><span class="material-icons" style="font-size:2.1rem;vertical-align:middle;color:#3a70d6;margin-right:5px;">local_shipping</span>Kirim Barang</h1>
-    <div class="desc">
-      Input pengiriman barang menggunakan barcode dan foto. Data dapat diekspor, diimpor, dan tidak hilang meski browser dihapus (export/import JSON).
-    </div>
-    <form id="kirimForm" autocomplete="off" onsubmit="return false;">
-      <div class="form-group">
-        <label>Kode Barang (scan barcode):</label>
-        <div style="display:flex;align-items:center;gap:0.5em;">
-          <input type="text" id="kodeBarang" required placeholder="Isi atau scan barcode..." autocomplete="off">
-          <button type="button" class="barcode-btn" onclick="focusBarcodeInput()">
-            <span class="material-icons" style="vertical-align:middle;">qr_code_scanner</span>
-          </button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Tujuan Pengiriman:</label>
-        <input type="text" id="tujuan" required placeholder="Contoh: Gudang Cabang A">
-      </div>
-      <div class="form-group">
-        <label>Foto Barang:</label>
-        <input type="file" id="fotoBarang" accept="image/*" capture="environment" onchange="previewPhoto(event)">
-        <img id="previewImg" class="photo-preview" />
-      </div>
-      <button class="btn" onclick="simpanKirim()"><span class="material-icons">send</span>Simpan Kirim</button>
-      <button class="btn" type="button" onclick="resetForm()"><span class="material-icons">refresh</span>Reset</button>
-    </form>
-    <div class="export-group">
-      <button class="btn" onclick="exportExcel()"><span class="material-icons">table_view</span>Export Excel</button>
-      <button class="btn" onclick="exportData()"><span class="material-icons">file_download</span>Export Data (JSON)</button>
-      <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)"/>
-      <button class="btn" onclick="document.getElementById('importFile').click()"><span class="material-icons">file_upload</span>Import Data</button>
-      <button class="btn" onclick="hapusSemua()" style="background:#fff2f0;color:#c13d25;border:1px solid #eaa6a6;"><span class="material-icons">delete</span>Hapus Semua</button>
-    </div>
-    <div class="laporan-box" id="laporanBox"></div>
-    <div class="footer">
-      &copy; 2025 Kirim Barang | Barcode, Foto, Export/Import, Data Aman
-    </div>
-  </div>
+  <h3>Form Pengiriman</h3>
+  <textarea id="catatan" placeholder="Catatan pengiriman..."></textarea>
+  <input id="id" placeholder="No ID Pengiriman">
+  <input id="penerima" placeholder="Nama Penerima">
+  <input id="cs" placeholder="Nama CS">
+  <select id="ecom">
+    <option value="">Pilih Ecom</option>
+    <option>Shopee</option>
+    <option>Lazada</option>
+    <option>Tokopedia</option>
+    <option>TikTok</option>
+    <option>Lainnya</option>
+  </select>
+  <select id="kurir">
+    <option value="">Pilih Kurir</option>
+    <option>JNE</option>
+    <option>J&T</option>
+    <option>SPX</option>
+    <option>LEX</option>
+  </select>
+  <select id="status">
+    <option>Dikirim</option>
+    <option>Berhasil</option>
+    <option>Gagal</option>
+    <option>Usut Tuntas</option>
+  </select>
+  <button onclick="tambahNode()">Tambah Node</button>
+
+  <h3>Tracking Node</h3>
+  <div id="nodes" class="nodes-grid"></div>
+
+  <input id="cekId" placeholder="Masukkan ID untuk verifikasi" oninput="cekNodeId()">
+
+  <h3>Filter Laporan</h3>
+  <input id="filterLaporan" placeholder="Cari nama/ID..." oninput="renderNode()">
+
+  <h3>Laporan Berhasil</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Penerima</th><th>CS</th><th>Ecom</th><th>Kurir</th><th>Status</th><th>Waktu</th><th>Catatan</th><th>Hapus</th>
+      </tr>
+    </thead>
+    <tbody id="laporan"></tbody>
+  </table>
+
+  <button onclick="exportData()">Export JSON</button>
+  <button onclick="exportCSV()">Export CSV</button>
+  <input type="file" accept="application/json" onchange="importData(event)">
+
   <script>
-    // IndexedDB Setup
-    const dbName = 'GudangKirim';
-    const storeName = 'kirimbarang';
-    let db;
+    let db, data = []
 
-    function bukaDB() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(dbName, 1);
-        req.onupgradeneeded = e => {
-          db = e.target.result;
-          if (!db.objectStoreNames.contains(storeName)) {
-            db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+    const openDB = indexedDB.open("track_pengiriman", 1)
+    openDB.onupgradeneeded = () => openDB.result.createObjectStore("data", { keyPath: "id" })
+    openDB.onsuccess = () => {
+      db = openDB.result
+      muat()
+    }
+
+    function tambahNode() {
+      const id = document.getElementById("id").value.trim()
+      if (!id) return
+
+      const obj = {
+        id,
+        penerima: document.getElementById("penerima").value,
+        cs: document.getElementById("cs").value,
+        ecom: document.getElementById("ecom").value,
+        kurir: document.getElementById("kurir").value,
+        status: document.getElementById("status").value,
+        waktu: new Date().toISOString(),
+        catatan: document.getElementById("catatan").value
+      }
+      const tx = db.transaction("data", "readwrite")
+      tx.objectStore("data").put(obj)
+      tx.oncomplete = () => {
+        kosongkanForm()
+        muat()
+      }
+    }
+
+    function kosongkanForm() {
+      ["id","penerima","cs","ecom","kurir","status","catatan"].forEach(id => document.getElementById(id).value = '')
+    }
+
+    function muat() {
+      const tx = db.transaction("data", "readonly")
+      const req = tx.objectStore("data").getAll()
+      req.onsuccess = () => {
+        data = req.result
+        renderNode()
+      }
+    }
+
+    function renderNode() {
+      const now = new Date()
+      const nodesDiv = document.getElementById("nodes")
+      const laporanBody = document.getElementById("laporan")
+      const filter = document.getElementById("filterLaporan").value.toLowerCase()
+      nodesDiv.innerHTML = ''
+      laporanBody.innerHTML = ''
+
+      // Urutkan data berdasarkan status (yang bukan Berhasil di depan)
+      const sortedData = [...data].sort((a, b) => {
+        if (a.status === 'Berhasil' && b.status !== 'Berhasil') return 1
+        if (a.status !== 'Berhasil' && b.status === 'Berhasil') return -1
+        return 0
+      })
+
+      sortedData.forEach(item => {
+        const umur = Math.floor((now - new Date(item.waktu)) / (1000 * 60 * 60 * 24))
+        if (item.status === 'Berhasil') {
+          if (
+            item.id.toLowerCase().includes(filter) ||
+            item.penerima.toLowerCase().includes(filter)
+          ) {
+            const row = document.createElement('tr')
+            row.innerHTML = `
+              <td>${item.id}</td>
+              <td>${item.penerima}</td>
+              <td>${item.cs}</td>
+              <td>${item.ecom}</td>
+              <td>${item.kurir}</td>
+              <td>${item.status}</td>
+              <td>${new Date(item.waktu).toLocaleString()}</td>
+              <td>${item.catatan}</td>
+              <td><span class="hapus" onclick="hapus('${item.id}')">Hapus</span></td>
+            `
+            laporanBody.appendChild(row)
           }
-        };
-        req.onsuccess = e => { db = e.target.result; resolve(db); };
-        req.onerror = e => reject(e.target.error);
-      });
-    }
+        } else {
+          const div = document.createElement("div")
+          div.className = "node"
+          div.innerHTML = `
+            <div style="font-weight:bold;">${item.id}</div>
+            <div style="font-size:0.6rem;margin:2px 0;">${item.status}</div>
+          `
 
-    // Save kirim data
-    async function simpanKirim() {
-      const kodeBarang = document.getElementById('kodeBarang').value.trim();
-      const tujuan = document.getElementById('tujuan').value.trim();
-      const fotoInput = document.getElementById('fotoBarang');
-      if (!kodeBarang || !tujuan) { alert('Kode barang dan tujuan wajib diisi!'); return; }
+          if (umur > 21) div.classList.add("blink-red")
+          else if (umur > 15) div.classList.add("blink-yellow")
 
-      let fotoData = '';
-      if (fotoInput.files && fotoInput.files[0]) {
-        fotoData = await getBase64(fotoInput.files[0]);
-      }
-      const now = new Date();
-      const kirim = {
-        kode: kodeBarang,
-        tujuan,
-        foto: fotoData,
-        waktu: now.toISOString()
-      };
-      await bukaDB();
-      await simpanKeDB(kirim);
-      alert('Data kirim barang tersimpan!');
-      resetForm();
-      renderLaporan();
-    }
-
-    function simpanKeDB(record) {
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction([storeName], 'readwrite');
-        tx.objectStore(storeName).add(record);
-        tx.oncomplete = resolve;
-        tx.onerror = e => reject(e.target.error);
-      });
-    }
-
-    function getAllData() {
-      return new Promise((resolve, reject) => {
-        bukaDB().then(() => {
-          const tx = db.transaction([storeName], 'readonly');
-          const store = tx.objectStore(storeName);
-          const req = store.getAll();
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = e => reject(e.target.error);
-        });
-      });
-    }
-
-    // Preview photo
-    function previewPhoto(event) {
-      const file = event.target.files[0];
-      if (!file) {
-        document.getElementById('previewImg').style.display = 'none';
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const img = document.getElementById('previewImg');
-        img.src = e.target.result;
-        img.style.display = 'block';
-      };
-      reader.readAsDataURL(file);
-    }
-    // Helper to get Base64
-    function getBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
-        reader.onerror = e => reject(e);
-        reader.readAsDataURL(file);
-      });
-    }
-
-    // Reset Form
-    function resetForm() {
-      document.getElementById('kirimForm').reset();
-      document.getElementById('previewImg').src = '';
-      document.getElementById('previewImg').style.display = 'none';
-      focusBarcodeInput();
-    }
-    function focusBarcodeInput() {
-      document.getElementById('kodeBarang').focus();
-      document.getElementById('kodeBarang').select();
-    }
-
-    // Render Laporan
-    async function renderLaporan() {
-      const laporanDiv = document.getElementById('laporanBox');
-      const data = await getAllData();
-      if (!data.length) {
-        laporanDiv.innerHTML = '<div style="color:#888;padding:10px 0;">Belum ada data kirim barang.</div>';
-        return;
-      }
-      let html = `<table><tr>
-        <th>No</th>
-        <th>Kode Barang</th>
-        <th>Tujuan</th>
-        <th>Foto</th>
-        <th>Waktu</th>
-        <th>Aksi</th>
-      </tr>`;
-      data.forEach((d, i) => {
-        html += `<tr>
-          <td>${i+1}</td>
-          <td>${escapeHtml(d.kode)}</td>
-          <td>${escapeHtml(d.tujuan)}</td>
-          <td>${d.foto ? `<img class="photo-thumb" src="${d.foto}" alt="Foto Barang">`:'-'}</td>
-          <td>${formatWaktu(d.waktu)}</td>
-          <td>
-            <button class="aksi-btn" title="Hapus Data" onclick="hapusData(${d.id})"><span class="material-icons" style="font-size:1.1em;">delete</span></button>
-          </td>
-        </tr>`;
-      });
-      html += '</table>';
-      laporanDiv.innerHTML = html;
-    }
-    function formatWaktu(ts) {
-      const d = new Date(ts);
-      return `${d.toLocaleDateString('id-ID')}<br>${d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
-    }
-    function escapeHtml(str) {
-      return (str+'').replace(/[&<>"']/g, m => ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-      }[m]));
-    }
-    // Hapus satu data
-    function hapusData(id) {
-      if (!confirm('Hapus data kirim barang ini?')) return;
-      bukaDB().then(() => {
-        const tx = db.transaction([storeName], 'readwrite');
-        tx.objectStore(storeName).delete(id);
-        tx.oncomplete = renderLaporan;
-      });
-    }
-    // Hapus semua data
-    function hapusSemua() {
-      if (!confirm('Hapus SEMUA data kirim barang?')) return;
-      bukaDB().then(()=>{
-        const tx = db.transaction([storeName], 'readwrite');
-        tx.objectStore(storeName).clear();
-        tx.oncomplete = renderLaporan;
-      });
-    }
-    // Export Excel
-    async function exportExcel() {
-      const data = await getAllData();
-      if (!data.length) return alert('Data kosong!');
-      let wsData = [
-        ['No','Kode Barang','Tujuan','Waktu Kirim']
-      ];
-      data.forEach((d,i)=>{
-        wsData.push([
-          i+1, d.kode, d.tujuan,
-          d.waktu ? (new Date(d.waktu)).toLocaleString('id-ID') : ''
-        ]);
-      });
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(wb, ws, "KirimBarang");
-      XLSX.writeFile(wb, "Laporan_KirimBarang.xlsx");
-    }
-    // Export/import JSON
-    async function exportData() {
-      const data = await getAllData();
-      if (!data.length) return alert('Data kosong!');
-      const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'kirim-barang-data.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-    async function importData(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async function(e) {
-        try {
-          const data = JSON.parse(e.target.result);
-          if (!Array.isArray(data)) throw new Error('Format file salah!');
-          await bukaDB();
-          for (const d of data) {
-            if (d.kode && d.tujuan && d.waktu)
-              await simpanKeDB(d);
+          const select = document.createElement("select")
+          select.innerHTML = `
+            <option ${item.status==='Dikirim'?'selected':''}>Dikirim</option>
+            <option ${item.status==='Berhasil'?'selected':''}>Berhasil</option>
+            <option ${item.status==='Gagal'?'selected':''}>Gagal</option>
+            <option ${item.status==='Usut Tuntas'?'selected':''}>Usut Tuntas</option>
+            <option ${item.status==='Kembali'?'selected':''}>Kembali</option>
+          `
+          select.onchange = () => {
+            item.status = select.value
+            const tx = db.transaction("data", "readwrite")
+            tx.objectStore("data").put(item)
+            tx.oncomplete = muat
           }
-          alert('Import berhasil!');
-          renderLaporan();
-        } catch (err) {
-          alert('Gagal import: ' + err.message);
+          div.appendChild(select)
+          nodesDiv.appendChild(div)
         }
-      };
-      reader.readAsText(file);
-      event.target.value = '';
+      })
     }
-    // Inisialisasi
-    bukaDB().then(renderLaporan);
+
+    function cekNodeId() {
+      const val = document.getElementById("cekId").value.trim()
+      const tx = db.transaction("data", "readwrite")
+      const store = tx.objectStore("data")
+      const req = store.get(val)
+      req.onsuccess = () => {
+        const obj = req.result
+        if (obj) {
+          obj.status = 'Berhasil'
+          store.put(obj)
+          tx.oncomplete = muat
+        }
+      }
+    }
+
+    function hapus(id) {
+      if (!confirm('Yakin ingin menghapus data ini?')) return
+      const tx = db.transaction("data", "readwrite")
+      tx.objectStore("data").delete(id)
+      tx.oncomplete = muat
+    }
+
+    function exportData() {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], {type: 'application/json'}))
+      a.download = 'track_pengiriman.json'
+      a.click()
+    }
+
+    function exportCSV() {
+      const rows = [
+        ["ID","Penerima","CS","Ecomerce","Kurir","Status","Waktu","Catatan"]
+      ]
+      data.forEach(d => {
+        if (d.status === 'Berhasil') {
+          rows.push([d.id, d.penerima, d.cs, d.ecom, d.kurir, d.status, new Date(d.waktu).toLocaleString(), d.catatan])
+        }
+      })
+      const csvContent = rows.map(e => e.map(v => `"${v}"`).join(",")).join("\n")
+      const a = document.createElement("a")
+      a.href = URL.createObjectURL(new Blob([csvContent], {type: "text/csv"}))
+      a.download = "laporan_pengiriman.csv"
+      a.click()
+    }
+
+    function importData(event) {
+      const file = event.target.files[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const arr = JSON.parse(reader.result)
+          if (!Array.isArray(arr)) throw new Error("Format data tidak valid")
+          
+          if (!confirm(`Anda akan mengimpor ${arr.length} data. Lanjutkan?`)) return
+          
+          const tx = db.transaction("data", "readwrite")
+          const store = tx.objectStore("data")
+          arr.forEach(item => store.put(item))
+          tx.oncomplete = () => {
+            alert(`Data berhasil diimpor (${arr.length} item)`)
+            muat()
+          }
+        } catch (e) {
+          alert("Gagal memuat data: " + e.message)
+        }
+      }
+      reader.readAsText(file)
+    }
   </script>
 </body>
 </html>
