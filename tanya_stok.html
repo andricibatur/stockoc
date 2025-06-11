@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pencarian Data dari Google Sheet (Stabil)</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    input { width: 100%; padding: 10px; font-size: 16px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 5px; text-align: left; font-size: 14px; }
+    tr.hide { display: none; }
+  </style>
+</head>
+<body>
+  <h2>🔍 Pencarian Data (Sheet1)</h2>
+  <input type="text" id="searchInput" placeholder="Ketik untuk cari...">
+  <div id="status">⏳ Mengambil data dari Sheet...</div>
+  <table id="dataTable"></table>
+
+  <script>
+    const SHEET_ID = "1wCbRKthx9RLrQ7qGPo10GYAAYOSjCsTFbLWNli5wAK8";
+    const SHEET_NAME = "Sheet1";
+    const searchInput = document.getElementById("searchInput");
+    const dataTable = document.getElementById("dataTable");
+    const status = document.getElementById("status");
+
+    function parseGoogleSheetData(json) {
+      const rows = json.table.rows.map(row =>
+        row.c.map(cell => (cell ? cell.v : ""))
+      );
+      return rows;
+    }
+
+    function renderTable(data) {
+      let html = "<thead><tr>";
+      html += data[0].map(h => `<th>${h}</th>`).join("");
+      html += "</tr></thead><tbody>";
+      data.slice(1).forEach(row => {
+        html += "<tr>" + row.map(c => `<td>${c}</td>`).join("") + "</tr>";
+      });
+      html += "</tbody>";
+      dataTable.innerHTML = html;
+    }
+
+    function loadSheetData() {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}`;
+      fetch(url)
+        .then(res => res.text())
+        .then(txt => {
+          const json = JSON.parse(txt.substr(47).slice(0, -2));
+          const data = parseGoogleSheetData(json);
+          renderTable(data);
+          status.textContent = "✅ Data berhasil dimuat dari Sheet1.";
+        })
+        .catch(err => {
+          console.error(err);
+          status.textContent = "❌ Gagal mengambil data. Pastikan sheet publik dan nama sheet benar.";
+        });
+    }
+
+    searchInput.addEventListener("input", () => {
+      const keyword = searchInput.value.toLowerCase();
+      const rows = dataTable.querySelectorAll("tbody tr");
+      rows.forEach(row => {
+        row.classList.toggle("hide", !row.textContent.toLowerCase().includes(keyword));
+      });
+    });
+
+    loadSheetData();
+  </script>
+</body>
+</html>
