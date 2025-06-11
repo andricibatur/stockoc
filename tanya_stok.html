@@ -2,20 +2,240 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pencarian Data dari Google Sheet (Stabil)</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    input { width: 100%; padding: 10px; font-size: 16px; margin-bottom: 10px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 5px; text-align: left; font-size: 14px; }
-    tr.hide { display: none; }
+    :root {
+      --primary-color: #4285f4;
+      --secondary-color: #34a853;
+      --text-color: #333;
+      --light-gray: #f5f5f5;
+      --medium-gray: #e0e0e0;
+      --dark-gray: #757575;
+      --white: #ffffff;
+      --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: var(--text-color);
+      background-color: var(--light-gray);
+      padding: 0;
+      margin: 0;
+    }
+    
+    .container {
+      max-width: 100%;
+      padding: 20px;
+      margin: 0 auto;
+    }
+    
+    header {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 20px 0;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .subtitle {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    
+    .search-container {
+      position: relative;
+      margin-bottom: 20px;
+      background-color: var(--white);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 15px;
+    }
+    
+    #searchInput {
+      width: 100%;
+      padding: 12px 15px;
+      font-size: 1rem;
+      border: 2px solid var(--medium-gray);
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      background-color: var(--white);
+    }
+    
+    #searchInput:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
+    }
+    
+    #searchInput::placeholder {
+      color: var(--dark-gray);
+    }
+    
+    .status-container {
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      background-color: var(--white);
+      box-shadow: var(--shadow);
+    }
+    
+    #status {
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .table-container {
+      overflow-x: auto;
+      background-color: var(--white);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+    }
+    
+    th {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 12px 15px;
+      text-align: left;
+      position: sticky;
+      top: 0;
+    }
+    
+    td {
+      padding: 10px 15px;
+      border-bottom: 1px solid var(--medium-gray);
+    }
+    
+    tr:nth-child(even) {
+      background-color: var(--light-gray);
+    }
+    
+    tr:hover {
+      background-color: rgba(66, 133, 244, 0.1);
+    }
+    
+    tr.hide {
+      display: none;
+    }
+    
+    .no-results {
+      padding: 20px;
+      text-align: center;
+      color: var(--dark-gray);
+      font-style: italic;
+    }
+    
+    /* Loading animation */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--white);
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .container {
+        padding: 15px;
+      }
+      
+      h1 {
+        font-size: 1.3rem;
+      }
+      
+      th, td {
+        padding: 8px 10px;
+        font-size: 0.9rem;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      header {
+        padding: 15px 0;
+      }
+      
+      h1 {
+        font-size: 1.2rem;
+      }
+      
+      .subtitle {
+        font-size: 0.8rem;
+      }
+      
+      #searchInput {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+      }
+      
+      .status-container {
+        padding: 8px 12px;
+      }
+      
+      #status {
+        font-size: 0.85rem;
+      }
+    }
   </style>
 </head>
 <body>
-  <h2>🔍 Pencarian Data (Sheet1)</h2>
-  <input type="text" id="searchInput" placeholder="Ketik untuk cari...">
-  <div id="status">⏳ Mengambil data dari Sheet...</div>
-  <table id="dataTable"></table>
+  <header>
+    <div class="container">
+      <h1>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        Pencarian Data (Sheet1)
+      </h1>
+      <p class="subtitle">Cari data dari Google Spreadsheet</p>
+    </div>
+  </header>
+  
+  <main class="container">
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Ketik kata kunci pencarian...">
+    </div>
+    
+    <div class="status-container">
+      <div id="status">⏳ Mengambil data dari Sheet...</div>
+    </div>
+    
+    <div class="table-container">
+      <table id="dataTable"></table>
+    </div>
+  </main>
 
   <script>
     const SHEET_ID = "1wCbRKthx9RLrQ7qGPo10GYAAYOSjCsTFbLWNli5wAK8";
@@ -32,17 +252,32 @@
     }
 
     function renderTable(data) {
+      if (data.length === 0) {
+        dataTable.innerHTML = '<div class="no-results">Tidak ada data yang ditemukan</div>';
+        return;
+      }
+      
       let html = "<thead><tr>";
       html += data[0].map(h => `<th>${h}</th>`).join("");
       html += "</tr></thead><tbody>";
-      data.slice(1).forEach(row => {
-        html += "<tr>" + row.map(c => `<td>${c}</td>`).join("") + "</tr>";
-      });
+      
+      const hasData = data.slice(1).length > 0;
+      
+      if (hasData) {
+        data.slice(1).forEach(row => {
+          html += "<tr>" + row.map(c => `<td>${c}</td>`).join("") + "</tr>";
+        });
+      } else {
+        html += '<tr><td colspan="' + data[0].length + '" style="text-align: center;">Tidak ada data</td></tr>';
+      }
+      
       html += "</tbody>";
       dataTable.innerHTML = html;
     }
 
     function loadSheetData() {
+      status.innerHTML = '<span class="loading"></span> Memuat data...';
+      
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}`;
       fetch(url)
         .then(res => res.text())
@@ -50,23 +285,48 @@
           const json = JSON.parse(txt.substr(47).slice(0, -2));
           const data = parseGoogleSheetData(json);
           renderTable(data);
-          status.textContent = "✅ Data berhasil dimuat dari Sheet1.";
+          status.innerHTML = '✅ Data berhasil dimuat. ' + 
+            `<span style="color: var(--dark-gray); font-size: 0.9em;">(${data.length - 1} baris data ditemukan)</span>`;
         })
         .catch(err => {
           console.error(err);
-          status.textContent = "❌ Gagal mengambil data. Pastikan sheet publik dan nama sheet benar.";
+          status.innerHTML = '❌ Gagal mengambil data. ' + 
+            '<span style="color: var(--dark-gray); font-size: 0.9em;">Pastikan sheet publik dan nama sheet benar.</span>';
         });
     }
 
     searchInput.addEventListener("input", () => {
       const keyword = searchInput.value.toLowerCase();
       const rows = dataTable.querySelectorAll("tbody tr");
+      let visibleCount = 0;
+      
       rows.forEach(row => {
-        row.classList.toggle("hide", !row.textContent.toLowerCase().includes(keyword));
+        const isVisible = row.textContent.toLowerCase().includes(keyword);
+        row.classList.toggle("hide", !isVisible);
+        if (isVisible) visibleCount++;
       });
+      
+      // Show no results message if no rows match
+      if (visibleCount === 0 && keyword.length > 0) {
+        const noResults = document.createElement("div");
+        noResults.className = "no-results";
+        noResults.textContent = "Tidak ada hasil yang cocok dengan pencarian Anda";
+        
+        // Check if no results message already exists
+        if (!dataTable.querySelector(".no-results")) {
+          dataTable.appendChild(noResults);
+        }
+      } else {
+        // Remove no results message if it exists and we have matches
+        const existingNoResults = dataTable.querySelector(".no-results");
+        if (existingNoResults) {
+          existingNoResults.remove();
+        }
+      }
     });
 
-    loadSheetData();
+    // Load data when page loads
+    document.addEventListener("DOMContentLoaded", loadSheetData);
   </script>
 </body>
-</html>
+  </html>
