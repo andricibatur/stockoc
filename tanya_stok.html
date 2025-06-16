@@ -251,12 +251,6 @@
   return rows;
 }
 
-const data = parseGoogleSheetData(json);
-const headers = data[0]; // Baris pertama adalah judul kolom
-console.log(headers);    // Menampilkan judul kolom di console
-
-    //edit judul batas
-    
     function renderTable(data) {
       if (data.length === 0) {
         dataTable.innerHTML = '<div class="no-results">Tidak ada data yang ditemukan</div>';
