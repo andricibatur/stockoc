@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barcode Generator for Xprinter</title>
+    <title>Barcode Generator</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
         body {
@@ -86,14 +86,14 @@
         }
         .print-settings {
             background-color: #f9f9f9;
-            padding: 15px;
-            margin-bottom: 10px;
+            padding: 14px;
+            margin-bottom: 7px;
             border-radius: 5px;
         }
     </style>
 </head>
 <body>
-    <h1 class="no-print">Barcode Generator for Xprinter</h1>
+    <h1 class="no-print">Barcode Generator</h1>
     
     <div class="print-settings no-print">
         <h3>Printer Settings</h3>
@@ -101,7 +101,7 @@
         <input type="number" id="paperWidth" value="80" min="50" max="100">
         
         <label for="barcodeHeight">Tinggi Barcode (mm):</label>
-        <input type="number" id="barcodeHeight" value="15" min="5" max="50">
+        <input type="number" id="barcodeHeight" value="9" min="5" max="50">
         
         <label for="barcodeType">Tipe Barcode:</label>
         <select id="barcodeType">
@@ -144,6 +144,22 @@
                 <td><input type="text" id="input6" placeholder="Masukkan teks untuk barcode"></td>
                 <td><input type="number" id="count6" min="1" value="1"></td>
             </tr>
+             <tr>
+                <td><input type="text" id="input7" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count7" min="1" value="1"></td>
+            </tr>
+             <tr>
+                <td><input type="text" id="input8" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count8" min="1" value="1"></td>
+            </tr>
+             <tr>
+                <td><input type="text" id="input9" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count9" min="1" value="1"></td>
+            </tr>
+             <tr>
+                <td><input type="text" id="input10" placeholder="Masukkan teks untuk barcode"></td>
+                <td><input type="number" id="count10" min="1" value="1"></td>
+            </tr>
         </tbody>
     </table>
     
@@ -184,7 +200,7 @@
                         svg.setAttribute('jsbarcode-displayvalue', 'true');
                         svg.setAttribute('jsbarcode-height', heightInPx);
                         svg.setAttribute('jsbarcode-width', '1,2');
-                        svg.setAttribute('jsbarcode-margin', '5');
+                        svg.setAttribute('jsbarcode-margin', '3');
                         svg.style.width = `${paperWidth}mm`;
                         svg.style.maxWidth = `${paperWidth}mm`;
                         
