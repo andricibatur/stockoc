@@ -219,7 +219,7 @@
         </svg>
         Pencarian Data (Sheet1)
       </h1>
-      <p class="subtitle">Cari data dari Google Spreadsheet</p>
+      <p class="subtitle">DATA STOCK OC</p>
     </div>
   </header>
   
@@ -229,7 +229,7 @@
     </div>
     
     <div class="status-container">
-      <div id="status">⏳ Mengambil data dari Sheet...</div>
+      <div id="status">⏳ Mengambil data dari ......</div>
     </div>
     
     <div class="table-container">
@@ -244,13 +244,19 @@
     const dataTable = document.getElementById("dataTable");
     const status = document.getElementById("status");
 
-    function parseGoogleSheetData(json) {
-      const rows = json.table.rows.map(row =>
-        row.c.map(cell => (cell ? cell.v : ""))
-      );
-      return rows;
-    }
+  function parseGoogleSheetData(json) {
+  const rows = json.table.rows.map(row =>
+    row.c.map(cell => (cell ? cell.v : ""))
+  );
+  return rows;
+}
 
+const data = parseGoogleSheetData(json);
+const headers = data[0]; // Baris pertama adalah judul kolom
+console.log(headers);    // Menampilkan judul kolom di console
+
+    //edit judul batas
+    
     function renderTable(data) {
       if (data.length === 0) {
         dataTable.innerHTML = '<div class="no-results">Tidak ada data yang ditemukan</div>';
