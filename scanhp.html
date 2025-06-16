@@ -6,24 +6,27 @@
   <title>Scanner Barcode</title>
   <style>
     body {
-      font-family: sans-serif;
-      padding: 10px;
+      font-family: Arial, sans-serif;
+      padding: 20px;
       max-width: 800px;
       margin: 0 auto;
+      line-height: 1.6;
     }
     #camera-container {
       position: relative;
       width: 100%;
-      max-width: 400px;
+      max-width: 500px;
       height: 300px;
-      border: 1px solid #ccc;
+      border: 2px solid #ddd;
       margin: 0 auto 20px;
       overflow: hidden;
+      background-color: #f0f0f0;
     }
     #camera {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: none; /* Awalnya disembunyikan sampai siap */
     }
     #overlay {
       position: absolute;
@@ -32,7 +35,7 @@
       width: 80%; 
       height: 30%;
       transform: translate(-50%, -50%);
-      border: 2px solid limegreen;
+      border: 3px dashed rgba(0, 255, 0, 0.7);
       box-sizing: border-box;
       pointer-events: none;
     }
@@ -44,60 +47,77 @@
       margin-bottom: 20px;
     }
     button {
-      padding: 10px 15px;
-      background-color: #4CAF50;
+      padding: 12px 18px;
+      background-color: #4285F4;
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
-      font-size: 14px;
-      min-width: 120px;
+      font-size: 15px;
+      min-width: 140px;
+      transition: all 0.3s;
     }
     button:hover {
-      background-color: #45a049;
+      background-color: #3367D6;
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
     }
     #log {
       white-space: pre-wrap;
       background: #f9f9f9;
       padding: 15px;
       border: 1px solid #ddd;
-      border-radius: 4px;
+      border-radius: 6px;
       height: 200px;
       overflow-y: auto;
-      font-family: monospace;
+      font-family: 'Courier New', monospace;
     }
     h2 {
       text-align: center;
       color: #333;
-    }
-    h3 {
-      margin-top: 20px;
-      color: #333;
+      margin-bottom: 10px;
     }
     #status {
       text-align: center;
-      margin: 10px 0;
-      font-style: italic;
-      color: #666;
+      margin: 15px 0;
+      padding: 10px;
+      border-radius: 4px;
+      background-color: #f8f9fa;
+      color: #333;
+    }
+    .error {
+      color: #d32f2f;
+      background-color: #ffebee;
+    }
+    .success {
+      color: #388e3c;
+      background-color: #e8f5e9;
+    }
+    .warning {
+      color: #ffa000;
+      background-color: #fff8e1;
     }
   </style>
 </head>
 <body>
 
   <h2>Scanner Barcode</h2>
-  <div id="status">Pilih "Scan Masuk" atau "Scan Keluar" untuk memulai</div>
+  <div id="status" class="warning">Pilih "Scan Masuk" atau "Scan Keluar" untuk memulai</div>
   
   <div id="camera-container">
-    <video id="camera"></video>
+    <video id="camera" playsinline></video>
     <div id="overlay"></div>
   </div>
 
   <div class="button-container">
     <button id="btnMasuk">Scan Masuk</button>
     <button id="btnKeluar">Scan Keluar</button>
-    <button id="btnTorch">Toggle Lampu</button>
-    <button id="btnKirimWA">Kirim WA</button>
-    <button id="btnCopy">Copy Laporan</button>
+    <button id="btnTorch" disabled>Toggle Lampu</button>
+    <button id="btnKirimWA" disabled>Kirim WA</button>
+    <button id="btnCopy" disabled>Copy Laporan</button>
     <button id="btnClear">Clear Laporan</button>
   </div>
 
@@ -106,178 +126,250 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
   <script>
-    const camContainer = document.getElementById('camera-container');
+    // Elemen DOM
     const cameraElement = document.getElementById('camera');
     const LOG = document.getElementById('log');
     const statusElement = document.getElementById('status');
-    let log = JSON.parse(localStorage.getItem('scanLog') || '[]');
-    let lastScan = 0, mode = null, track = null;
+    const btnTorch = document.getElementById('btnTorch');
+    const btnKirimWA = document.getElementById('btnKirimWA');
+    const btnCopy = document.getElementById('btnCopy');
+    
+    // Variabel state
+    let log = JSON.parse(localStorage.getItem('scanLog') || [];
+    let lastScan = 0;
+    let mode = null;
+    let track = null;
     let isScanning = false;
+    let stream = null;
 
+    // Inisialisasi log
     function updateLog() {
-      LOG.textContent = log.join('\n');
+      LOG.textContent = log.join('\n') || 'Tidak ada data laporan';
       localStorage.setItem('scanLog', JSON.stringify(log));
+      
+      // Aktifkan/nonaktifkan tombol berdasarkan isi log
+      btnKirimWA.disabled = log.length === 0;
+      btnCopy.disabled = log.length === 0;
     }
     updateLog();
 
-    function updateStatus(message) {
+    // Update status dengan class styling
+    function updateStatus(message, type = 'info') {
       statusElement.textContent = message;
+      statusElement.className = type;
     }
 
+    // Fungsi beep
     function beep() {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1000, ctx.currentTime);
-      osc.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.1);
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1500, ctx.currentTime);
+        osc.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+      } catch (e) {
+        console.warn("Tidak bisa memainkan suara:", e);
+      }
     }
 
-    function startScanner(selectedMode) {
-      if (isScanning && mode === selectedMode) {
-        updateStatus(`Sudah dalam mode ${mode}`);
-        return;
+    // Fungsi untuk memulai scanner
+    async function startScanner(selectedMode) {
+      if (isScanning) {
+        await stopScanner();
       }
       
       mode = selectedMode;
-      lastScan = 0;
-      isScanning = true;
+      updateStatus(`Menyiapkan scanner ${mode}...`, 'warning');
       
-      updateStatus(`Memulai scanner mode ${mode}...`);
-      
-      Quagga.stop();
-      Quagga.init({
-        inputStream: {
-          name: "Live",
-          type: "LiveStream",
-          target: cameraElement,
-          constraints: { 
+      try {
+        // Dapatkan akses kamera terlebih dahulu
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
             facingMode: "environment",
-            width: { min: 640 },
-            height: { min: 480 }
-          }
-        },
-        locator: {
-          patchSize: "medium",
-          halfSample: true
-        },
-        numOfWorkers: 4,
-        decoder: { 
-          readers: [
-            "code_128_reader", 
-            "ean_reader",
-            "ean_8_reader",
-            "code_39_reader",
-            "code_39_vin_reader",
-            "codabar_reader",
-            "upc_reader",
-            "upc_e_reader"
-          ] 
-        },
-        locate: true
-      }, err => {
-        if (err) {
-          updateStatus(`Error: ${err}`);
-          console.error(err);
-          isScanning = false;
-          return;
-        }
-        Quagga.start();
-        updateStatus(`Scanner ${mode} aktif - Arahkan ke barcode`);
+            width: { min: 640, ideal: 1280 },
+            height: { min: 480, ideal: 720 }
+          },
+          audio: false
+        });
         
-        try {
-          const stream = cameraElement.srcObject;
-          if (stream) {
-            track = stream.getVideoTracks()[0];
+        cameraElement.srcObject = stream;
+        cameraElement.style.display = 'block';
+        track = stream.getVideoTracks()[0];
+        
+        // Periksa apakah perangkat mendukung torch
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+        btnTorch.disabled = !('torch' in capabilities);
+        
+        // Inisialisasi Quagga
+        await initQuagga();
+        
+        isScanning = true;
+        updateStatus(`Scanner ${mode} aktif - Arahkan ke barcode`, 'success');
+        
+      } catch (err) {
+        console.error("Error mengakses kamera:", err);
+        updateStatus(`Gagal mengakses kamera: ${err.message}`, 'error');
+        isScanning = false;
+      }
+    }
+
+    // Inisialisasi Quagga
+    function initQuagga() {
+      return new Promise((resolve, reject) => {
+        Quagga.init({
+          inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: cameraElement,
+            constraints: {
+              facingMode: "environment",
+              width: { min: 640 },
+              height: { min: 480 }
+            }
+          },
+          locator: {
+            patchSize: "medium",
+            halfSample: true
+          },
+          numOfWorkers: navigator.hardwareConcurrency || 4,
+          frequency: 10,
+          decoder: {
+            readers: [
+              "code_128_reader",
+              "ean_reader",
+              "ean_8_reader",
+              "code_39_reader",
+              "code_39_vin_reader",
+              "codabar_reader",
+              "upc_reader",
+              "upc_e_reader"
+            ]
+          },
+          locate: true
+        }, err => {
+          if (err) {
+            console.error("Error inisialisasi Quagga:", err);
+            reject(err);
+            return;
           }
-        } catch (e) {
-          console.warn("Tidak bisa mengakses track kamera:", e);
-        }
+          
+          Quagga.start();
+          resolve();
+        });
       });
     }
 
+    // Fungsi untuk menghentikan scanner
+    async function stopScanner() {
+      if (!isScanning) return;
+      
+      Quagga.stop();
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      
+      cameraElement.srcObject = null;
+      cameraElement.style.display = 'none';
+      track = null;
+      isScanning = false;
+      btnTorch.disabled = true;
+      
+      updateStatus(`Scanner dihentikan`, 'warning');
+    }
+
+    // Event listener untuk hasil scan
     Quagga.onDetected(res => {
       const now = Date.now();
-      if (!mode || (now - lastScan) < 3000) return;
+      if (!mode || (now - lastScan) < 2000) return; // Debounce 2 detik
       lastScan = now;
-
+      
+      if (!res.codeResult || !res.codeResult.code) {
+        console.warn("Barcode terdeteksi tapi tidak bisa dibaca", res);
+        return;
+      }
+      
       beep();
       const code = res.codeResult.code;
-      const timestamp = new Date().toLocaleString();
+      const timestamp = new Date().toLocaleTimeString();
       const logEntry = `[${timestamp}] ${mode}: ${code}`;
       
       log.push(logEntry);
       updateLog();
-      
-      // Notifikasi sukses
-      updateStatus(`Berhasil scan: ${code}`);
-      
-      // Tampilkan alert hanya di mode development
-      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-        alert(`${mode}: ${code}`);
-      }
+      updateStatus(`Berhasil scan: ${code}`, 'success');
     });
 
     // Event listeners untuk tombol
-    document.getElementById('btnMasuk').onclick = () => startScanner('Masuk');
-    document.getElementById('btnKeluar').onclick = () => startScanner('Keluar');
+    document.getElementById('btnMasuk').addEventListener('click', () => startScanner('Masuk'));
+    document.getElementById('btnKeluar').addEventListener('click', () => startScanner('Keluar'));
 
-    document.getElementById('btnTorch').onclick = () => {
+    document.getElementById('btnTorch').addEventListener('click', async () => {
       if (!track) {
-        updateStatus("Mulai scanner terlebih dahulu");
+        updateStatus("Mulai scanner terlebih dahulu", 'error');
         return;
       }
       
-      const cap = track.getCapabilities ? track.getCapabilities() : {};
-      if ('torch' in cap) {
+      try {
         const settings = track.getSettings();
-        track.applyConstraints({ 
+        await track.applyConstraints({ 
           advanced: [{ torch: !settings.torch }] 
-        }).then(() => {
-          updateStatus(settings.torch ? "Lampu dimatikan" : "Lampu dihidupkan");
-        }).catch(err => {
-          console.error("Gagal mengubah torch:", err);
-          updateStatus("Gagal mengontrol lampu");
         });
-      } else {
-        updateStatus("Perangkat tidak mendukung lampu flash");
-      }
-    };
-
-    document.getElementById('btnKirimWA').onclick = () => {
-      const text = log.join('\n') || 'Laporan kosong';
-      // Ganti YOURPHONENUMBER dengan nomor WhatsApp tujuan
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-    };
-
-    document.getElementById('btnCopy').onclick = () => {
-      const text = log.join('\n') || 'Tidak ada data untuk disalin';
-      navigator.clipboard.writeText(text)
-        .then(() => {
-          updateStatus("Laporan berhasil disalin!");
-          setTimeout(() => updateStatus(`Scanner ${mode || 'tidak'} aktif`), 2000);
-        })
-        .catch(err => {
-          console.error("Gagal menyalin:", err);
-          updateStatus("Gagal menyalin laporan");
-        });
-    };
-
-    document.getElementById('btnClear').onclick = () => {
-      if (confirm('Apakah Anda yakin ingin menghapus semua laporan?')) {
-        log = [];
-        updateLog();
-        updateStatus("Laporan telah dihapus");
-      }
-    };
-
-    // Bersihkan scanner saat hditutup
-    window.addEventListener('beforeunload', () => {
-      if (isScanning) {
-        Quagga.stop();
+        updateStatus(`Lampu ${settings.torch ? 'dimatikan' : 'dihidupkan'}`, 'info');
+      } catch (err) {
+        console.error("Gagal mengontrol torch:", err);
+        updateStatus("Gagal mengontrol lampu", 'error');
       }
     });
+
+    document.getElementById('btnKirimWA').addEventListener('click', () => {
+      const text = "Laporan Scan Barcode:\n\n" + (log.join('\n') || 'Tidak ada data');
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    });
+
+    document.getElementById('btnCopy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(log.join('\n'));
+        updateStatus("Laporan berhasil disalin!", 'success');
+        setTimeout(() => {
+          if (isScanning) {
+            updateStatus(`Scanner ${mode} aktif - Arahkan ke barcode`, 'success');
+          } else {
+            updateStatus("Pilih mode scan untuk memulai", 'warning');
+          }
+        }, 2000);
+      } catch (err) {
+        console.error("Gagal menyalin:", err);
+        updateStatus("Gagal menyalin laporan", 'error');
+      }
+    });
+
+    document.getElementById('btnClear').addEventListener('click', () => {
+      if (log.length === 0 || confirm('Apakah Anda yakin ingin menghapus semua laporan?')) {
+        log = [];
+        updateLog();
+        updateStatus("Laporan telah dihapus", 'warning');
+      }
+    });
+
+    // Bersihkan saat halaman ditutup
+    window.addEventListener('beforeunload', () => {
+      if (isScanning) {
+        stopScanner();
+      }
+    });
+
+    // Cek fitur yang didukung browser
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      updateStatus("Browser tidak mendukung akses kamera", 'error');
+      document.getElementById('btnMasuk').disabled = true;
+      document.getElementById('btnKeluar').disabled = true;
+    }
+
+    if (!navigator.clipboard) {
+      document.getElementById('btnCopy').disabled = true;
+    }
   </script>
 </body>
 </html>
