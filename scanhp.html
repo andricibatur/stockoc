@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App Scan Barcode</title>
+  <style>
+    body { font-family: sans-serif; padding: 10px; }
+    #camera { width: 100%; max-width: 400px; height: 300px; border: 1px solid #ccc; margin-bottom: 10px; }
+    button { margin: 5px; padding: 10px; }
+    #log { white-space: pre-wrap; background: #f9f9f9; padding: 10px; height: 150px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+  <h2>Scanner Barcode</h2>
+  <div id="camera"></div>
+
+  <button id="btnMasuk">Scan Masuk</button>
+  <button id="btnKeluar">Scan Keluar</button>
+  <button id="btnKirimWA">Kirim WA</button>
+  <button id="btnClear">Clear Laporan</button>
+
+  <h3>Laporan:</h3>
+  <div id="log"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+  <script>
+    const CAMERA = document.getElementById('camera');
+    const LOGEL = document.getElementById('log');
+    let lastScanTime = 0;
+    let currentMode = null; // "Masuk" atau "Keluar"
+    let log = JSON.parse(localStorage.getItem('scanLog') || '[]');
+
+    function updateLogUI() {
+      LOGEL.textContent = log.map(e => e.time + ' | ' + e.mode + ' | ' + e.code).join('\n');
+    }
+
+    updateLogUI();
+
+    function startScanner(mode) {
+      currentMode = mode;
+      Quagga.init({
+        inputStream: {
+          target: CAMERA,
+          type: 'LiveStream',
+          constraints: { facingMode: 'environment' }
+        },
+        decoder: { readers: ['code_128_reader','ean_reader'] }
+      }, err => {
+        if (err) return alert(err);
+        Quagga.start();
+      });
+    }
+
+    Quagga.onDetected(result => {
+      const now = Date.now();
+      if (!currentMode) return;
+      if (now - lastScanTime < 3000) return; // throttle 3 detik
+      lastScanTime = now;
+
+      const code = result.codeResult.code;
+      const entry = { time: new Date().toLocaleString(), mode: currentMode, code };
+      log.push(entry);
+      localStorage.setItem('scanLog', JSON.stringify(log));
+      updateLogUI();
+      alert(`${currentMode} berhasil: ${code}`);
+    });
+
+    document.getElementById('btnMasuk').addEventListener('click', () => startScanner('Masuk'));
+    document.getElementById('btnKeluar').addEventListener('click', () => startScanner('Keluar'));
+
+    document.getElementById('btnKirimWA').addEventListener('click', () => {
+      const text = log.map(e => `${e.time} | ${e.mode} | ${e.code}`).join('\n');
+      const waLink = `https://wa.me/YOURPHONENUMBER?text=${encodeURIComponent(text)}`;
+      window.open(waLink, '_blank');
+    });
+
+    document.getElementById('btnClear').addEventListener('click', () => {
+      if (confirm('Yakin hapus semua laporan?')) {
+        log = [];
+        localStorage.removeItem('scanLog');
+        updateLogUI();
+      }
+    });
+  </script>
+
+</body>
+</html>
