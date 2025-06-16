@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Scanner Barcode</title>
+  <title>Scanner Barcode (Interval 4 Detik)</title>
   <style>
     body {
       font-family: sans-serif;
@@ -63,7 +63,8 @@
 </head>
 <body>
 
-  <h2 style="text-align: center;">Scanner Barcode dd</h2>
+  <h2 style="text-align: center;">Scanner Barcode</h2>
+  <p style="text-align: center; color: #666;">Interval scan: 4 detik</p>
   
   <div id="reader"></div>
   
@@ -79,9 +80,9 @@
   <h3>Riwayat Scan:</h3>
   <div id="log"></div>
 
-  <!-- Gunakan library html5-qrcode yang lebih stabil -->
   <script src="https://unpkg.com/html5-qrcode@2.3.4/html5-qrcode.min.js"></script>
   <script>
+    // Variabel global
     const scanner = new Html5Qrcode("reader");
     const resultDiv = document.getElementById('result');
     const logDiv = document.getElementById('log');
@@ -92,7 +93,8 @@
     
     let scanHistory = JSON.parse(localStorage.getItem('scanHistory')) || [];
     let isScanning = false;
-    
+    let lastScanTime = 0; // Untuk tracking interval 4 detik
+
     // Update log display
     function updateLog() {
       logDiv.innerHTML = scanHistory.map(entry => 
@@ -126,7 +128,6 @@
     // Start scanning
     async function startScan() {
       try {
-        // Konfigurasi scanner
         const config = { 
           fps: 10, 
           qrbox: { width: 250, height: 100 },
@@ -141,7 +142,6 @@
           ]
         };
         
-        // Mulai scanner
         await scanner.start(
           { facingMode: "environment" }, 
           config,
@@ -153,7 +153,7 @@
         startBtn.disabled = true;
         stopBtn.disabled = false;
         torchBtn.disabled = false;
-        resultDiv.textContent = "Sedang memindai...";
+        resultDiv.textContent = "Sedang memindai... (interval 4 detik)";
         
       } catch (err) {
         console.error("Gagal memulai scanner:", err);
@@ -194,34 +194,39 @@
       }
     }
     
-    // Callback saat scan berhasil
+    // Callback saat scan berhasil (dengan interval 4 detik)
     function onScanSuccess(decodedText, decodedResult) {
+      const now = Date.now();
+      
+      // Jika belum 4 detik sejak scan terakhir, abaikan
+      if (now - lastScanTime < 4000) {
+        resultDiv.textContent = `Tunggu ${((4000 - (now - lastScanTime))/1000).toFixed(1)} detik lagi...`;
+        return;
+      }
+      
+      lastScanTime = now;
       playBeep();
       
-      const now = new Date();
-      const timeString = now.toLocaleTimeString();
-      const dateString = now.toLocaleDateString();
+      const nowDate = new Date();
+      const timeString = nowDate.toLocaleTimeString();
+      const dateString = nowDate.toLocaleDateString();
       
-      // Tambahkan ke riwayat
       scanHistory.unshift({
         text: decodedText,
         time: timeString,
         date: dateString
       });
       
-      // Batasi riwayat maksimal 50 item
       if (scanHistory.length > 50) {
         scanHistory.pop();
       }
       
-      // Update tampilan
       resultDiv.innerHTML = `<strong>Hasil Scan:</strong> ${decodedText}`;
       updateLog();
     }
     
     // Callback saat scan error
     function onScanError(errorMessage) {
-      // Abaikan error umum (tidak menemukan kode)
       if (!errorMessage.includes("NotFoundException")) {
         console.warn("Scan error:", errorMessage);
       }
@@ -239,7 +244,7 @@
         `${entry.text} (${entry.date} ${entry.time})`
       ).join("%0A");
       
-      window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+      window.open(`https://wa.me/${6281220001748}?text=${message}`, "_blank");
     }
     
     // Event listeners
