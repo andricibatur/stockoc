@@ -59,11 +59,17 @@
       color: #666;
       font-size: 0.8em;
     }
+    #clearBtn {
+      background: #f44336;
+    }
+    #clearBtn:hover {
+      background: #d32f2f;
+    }
   </style>
 </head>
 <body>
 
-  <h2 style="text-align: center;">Scanner Barcode</h2>
+  <h2 style="text-align: center;">Scanner Barcode kirim ke WA Daffa </h2>
   <p style="text-align: center; color: #666;">Interval scan: 4 detik</p>
   
   <div id="reader"></div>
@@ -73,6 +79,7 @@
     <button id="stopBtn" disabled>Stop Scan</button>
     <button id="torchBtn" disabled>Lampu</button>
     <button id="waBtn">Kirim WA</button>
+    <button id="clearBtn">Clear Laporan</button>
   </div>
   
   <div id="result">Hasil scan akan muncul di sini</div>
@@ -90,6 +97,7 @@
     const stopBtn = document.getElementById('stopBtn');
     const torchBtn = document.getElementById('torchBtn');
     const waBtn = document.getElementById('waBtn');
+    const clearBtn = document.getElementById('clearBtn');
     
     let scanHistory = JSON.parse(localStorage.getItem('scanHistory')) || [];
     let isScanning = false;
@@ -100,12 +108,20 @@
       logDiv.innerHTML = scanHistory.map(entry => 
         `<div class="log-entry">
           <div><strong>${entry.text}</strong></div>
-          <div class="timestamp">${entry.time} - ${entry.date}</div>
         </div>`
       ).join('');
       localStorage.setItem('scanHistory', JSON.stringify(scanHistory));
     }
     updateLog();
+    
+    // Clear log
+    function clearLog() {
+      if (confirm("Apakah Anda yakin ingin menghapus semua riwayat scan?")) {
+        scanHistory = [];
+        updateLog();
+        resultDiv.textContent = "Riwayat scan telah dihapus";
+      }
+    }
     
     // Beep sound
     function playBeep() {
@@ -240,9 +256,7 @@
       }
       
       const phoneNumber = ""; // Isi dengan nomor WhatsApp tujuan
-      const message = scanHistory.map(entry => 
-        `${entry.text} (${entry.date} ${entry.time})`
-      ).join("%0A");
+      const message = scanHistory.map(entry => entry.text).join("%0A");
       
       window.open(`https://wa.me/${6281220001748}?text=${message}`, "_blank");
     }
@@ -252,6 +266,7 @@
     stopBtn.addEventListener("click", stopScan);
     torchBtn.addEventListener("click", toggleTorch);
     waBtn.addEventListener("click", sendToWhatsApp);
+    clearBtn.addEventListener("click", clearLog);
     
     // Bersihkan scanner saat halaman ditutup
     window.addEventListener("beforeunload", () => {
