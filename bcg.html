@@ -183,9 +183,9 @@
             const barcodeType = document.getElementById('barcodeType').value;
             
             // Convert mm to pixels (approximate)
-            const heightInPx = Math.round(barcodeHeight * 3.78);
+            const heightInPx = Math.round(barcodeHeight * 4.78);
             
-            for (let i = 1; i <= 6; i++) {
+            for (let i = 1; i <= 10; i++) {
                 const inputText = document.getElementById(`input${i}`).value.trim();
                 const count = parseInt(document.getElementById(`count${i}`).value);
                 
@@ -199,7 +199,7 @@
                         svg.setAttribute('jsbarcode-format', barcodeType);
                         svg.setAttribute('jsbarcode-displayvalue', 'true');
                         svg.setAttribute('jsbarcode-height', heightInPx);
-                        svg.setAttribute('jsbarcode-width', '1,2');
+                        svg.setAttribute('jsbarcode-width', '1,8');
                         svg.setAttribute('jsbarcode-margin', '3');
                         svg.style.width = `${paperWidth}mm`;
                         svg.style.maxWidth = `${paperWidth}mm`;
