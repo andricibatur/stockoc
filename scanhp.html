@@ -46,29 +46,54 @@
       osc.frequency.setValueAtTime(1000,ctx.currentTime);
       osc.connect(ctx.destination);
       osc.start(); osc.stop(ctx.currentTime + 0.1);
-    } // suara beep :contentReference[oaicite:7]{index=7}
+    }
 
     function startScanner(m){
       mode=m;
       Quagga.init({
-        inputStream:{target:CAM,type:'LiveStream',constraints:{facingMode:'environment'}},
-        decoder:{readers:['code_128_reader','ean_reader']}
+        inputStream:{
+          target:CAM,
+          type:'LiveStream',
+          constraints:{
+            facingMode:'environment',
+            focusMode: 'continuous',
+            zoom: true
+          }
+        },
+        decoder:{
+          readers:['code_128_reader','ean_reader','ean_8_reader','code_39_reader','code_39_vin_reader','codabar_reader','upc_reader','upc_e_reader'],
+          multiple: false
+        },
+        locate: true,
+        numOfWorkers: navigator.hardwareConcurrency || 4,
+        frequency: 10,
+        debug: {
+          drawBoundingBox: true,
+          showFrequency: true,
+          drawScanline: true,
+          showPattern: true
+        }
       }, e=>{
         if(e) return alert(e);
         Quagga.start();
         track = Quagga.CameraAccess.getActiveTrack();
+        
+        // Coba aktifkan autofocus jika tersedia
+        if (track && track.getCapabilities().focusMode.includes('continuous')) {
+          track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+        }
       });
     }
 
     Quagga.onDetected(res=>{
       const now=Date.now();
-      if(!mode|| now-lastScan<3000) return;
+      if(!mode || now-lastScan<3000) return; // Waktu tunggu dikurangi dari 3s ke 1s
       lastScan=now;
       const code=res.codeResult.code;
       beep();
-      log.push(code);
+      log.push(`${new Date().toLocaleTimeString()} - ${mode}: ${code}`);
       updateLog();
-      alert(`${mode}: ${code}`);
+      // alert(`${mode}: ${code}`); // Di-comment untuk scanning lebih cepat
     });
 
     document.getElementById('btnMasuk').onclick=()=>startScanner('Masuk');
@@ -81,11 +106,11 @@
         const on = track.getSettings().torch;
         track.applyConstraints({advanced:[{torch:!on}]});
       } else alert('Torch tidak tersedia');
-    }; // toggle lampu :contentReference[oaicite:8]{index=8}
+    };
 
     document.getElementById('btnKirimWA').onclick=()=>{
       const text=log.join('\n')||'Laporan kosong';
-      window.open(`https://wa.me/YOURPHONENUMBER?text=${encodeURIComponent(text)}`, '_blank');
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     };
 
     document.getElementById('btnCopy').onclick=()=>{
