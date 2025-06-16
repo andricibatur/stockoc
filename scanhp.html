@@ -2,19 +2,55 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>App Scan Barcode</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner Barcode</title>
   <style>
-    body{font-family:sans-serif;padding:10px;}
-    #camera{width:100%;max-width:400px;height:300px;border:1px solid #ccc;margin-bottom:10px;}
-    button{margin:5px;padding:10px;}
-    #log{white-space:pre-wrap;background:#f9f9f9;padding:10px;height:150px;overflow-y:auto;}
+    body {
+      font-family: sans-serif;
+      padding: 10px;
+    }
+    #camera-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      height: 300px;
+      border: 1px solid #ccc;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    #camera {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #overlay {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 60%; height: 40%;
+      transform: translate(-50%, -50%);
+      border: 2px solid limegreen;
+      box-sizing: border-box;
+      pointer-events: none;
+    }
+    button {
+      margin: 5px; padding: 10px;
+    }
+    #log {
+      white-space: pre-wrap;
+      background: #f9f9f9;
+      padding: 10px;
+      height: 150px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
 
   <h2>Scanner Barcode</h2>
-  <div id="camera"></div>
+  <div id="camera-container">
+    <div id="camera"></div>
+    <div id="overlay"></div>
+  </div>
 
   <button id="btnMasuk">Scan Masuk</button>
   <button id="btnKeluar">Scan Keluar</button>
@@ -28,73 +64,97 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
   <script>
-    const CAM = document.getElementById('camera');
+    const camContainer = document.getElementById('camera-container');
+    const camDiv = document.getElementById('camera');
     const LOG = document.getElementById('log');
-    let log = JSON.parse(localStorage.getItem('scanLog')||'[]');
-    let lastScan = 0, mode=null, track=null;
+    let log = JSON.parse(localStorage.getItem('scanLog') || '[]');
+    let lastScan = 0, mode = null, track = null;
 
-    function updateLog(){
+    function updateLog() {
       LOG.textContent = log.join('\n');
       localStorage.setItem('scanLog', JSON.stringify(log));
     }
     updateLog();
 
-    function beep(){
-      const ctx=new (window.AudioContext||window.webkitAudioContext)();
-      const osc=ctx.createOscillator();
-      osc.type='sine';
-      osc.frequency.setValueAtTime(1000,ctx.currentTime);
+    function beep() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1000, ctx.currentTime);
       osc.connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.1);
-    } // suara beep :contentReference[oaicite:7]{index=7}
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    }
 
-    function startScanner(m){
-      mode=m;
+    function startScanner(selectedMode) {
+      mode = selectedMode;
+      lastScan = 0;
+      Quagga.stop(); // Reset terlebih dahulu
       Quagga.init({
-        inputStream:{target:CAM,type:'LiveStream',constraints:{facingMode:'environment'}},
-        decoder:{readers:['code_128_reader','ean_reader']}
-      }, e=>{
-        if(e) return alert(e);
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: camDiv,
+          constraints: { facingMode: "environment" }
+        },
+        locator: {
+          patchSize: "medium",
+          halfSample: true
+        },
+        decoder: { readers: ["code_128_reader", "ean_reader"] },
+        locate: true
+      }, err => {
+        if (err) {
+          alert(err);
+          return;
+        }
         Quagga.start();
-        track = Quagga.CameraAccess.getActiveTrack();
+        const trackList = Quagga.CameraAccess.getActiveTrack();
+        track = trackList || null;
       });
     }
 
-    Quagga.onDetected(res=>{
-      const now=Date.now();
-      if(!mode|| now-lastScan<3000) return;
-      lastScan=now;
-      const code=res.codeResult.code;
+    Quagga.onProcessed(result => {
+      // welcome overlay guidance
+    });
+
+    Quagga.onDetected(res => {
+      const now = Date.now();
+      if (!mode || (now - lastScan) < 3000) return;
+      lastScan = now;
+
       beep();
+      const code = res.codeResult.code;
       log.push(code);
       updateLog();
       alert(`${mode}: ${code}`);
     });
 
-    document.getElementById('btnMasuk').onclick=()=>startScanner('Masuk');
-    document.getElementById('btnKeluar').onclick=()=>startScanner('Keluar');
+    document.getElementById('btnMasuk').onclick = () => startScanner('Masuk');
+    document.getElementById('btnKeluar').onclick = () => startScanner('Keluar');
 
-    document.getElementById('btnTorch').onclick=()=>{
-      if(!track) return alert('Mulai scanner dulu');
-      const cap=track.getCapabilities();
-      if(cap.torch){
-        const on = track.getSettings().torch;
-        track.applyConstraints({advanced:[{torch:!on}]});
+    document.getElementById('btnTorch').onclick = () => {
+      if (!track) return alert('Mulai scanner dulu');
+      const cap = track.getCapabilities();
+      if (cap.torch) {
+        const settings = track.getSettings();
+        track.applyConstraints({ advanced: [{ torch: !settings.torch }] });
       } else alert('Torch tidak tersedia');
-    }; // toggle lampu :contentReference[oaicite:8]{index=8}
+    };
 
-    document.getElementById('btnKirimWA').onclick=()=>{
-      const text=log.join('\n')||'Laporan kosong';
+    document.getElementById('btnKirimWA').onclick = () => {
+      const text = log.join('\n') || 'Laporan kosong';
       window.open(`https://wa.me/YOURPHONENUMBER?text=${encodeURIComponent(text)}`, '_blank');
     };
 
-    document.getElementById('btnCopy').onclick=()=>{
-      navigator.clipboard.writeText(log.join('\n')).then(()=>alert('Tersalin!'));
+    document.getElementById('btnCopy').onclick = () => {
+      navigator.clipboard.writeText(log.join('\n')).then(() => alert('Tersalin!'));
     };
 
-    document.getElementById('btnClear').onclick=()=>{
-      if(confirm('Hapus semua laporan?')){
-        log=[]; updateLog();
+    document.getElementById('btnClear').onclick = () => {
+      if (confirm('Hapus semua laporan?')) {
+        log = [];
+        updateLog();
       }
     };
   </script>
