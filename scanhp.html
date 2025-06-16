@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>App Scan Barcode</title>
   <style>
-    body { font-family: sans-serif; padding: 10px; }
-    #camera { width: 100%; max-width: 400px; height: 300px; border: 1px solid #ccc; margin-bottom: 10px; }
-    button { margin: 5px; padding: 10px; }
-    #log { white-space: pre-wrap; background: #f9f9f9; padding: 10px; height: 150px; overflow-y: auto; }
+    body{font-family:sans-serif;padding:10px;}
+    #camera{width:100%;max-width:400px;height:300px;border:1px solid #ccc;margin-bottom:10px;}
+    button{margin:5px;padding:10px;}
+    #log{white-space:pre-wrap;background:#f9f9f9;padding:10px;height:150px;overflow-y:auto;}
   </style>
 </head>
 <body>
@@ -18,7 +18,9 @@
 
   <button id="btnMasuk">Scan Masuk</button>
   <button id="btnKeluar">Scan Keluar</button>
+  <button id="btnTorch">Toggle Lampu</button>
   <button id="btnKirimWA">Kirim WA</button>
+  <button id="btnCopy">Copy Laporan</button>
   <button id="btnClear">Clear Laporan</button>
 
   <h3>Laporan:</h3>
@@ -26,64 +28,75 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
   <script>
-    const CAMERA = document.getElementById('camera');
-    const LOGEL = document.getElementById('log');
-    let lastScanTime = 0;
-    let currentMode = null; // "Masuk" atau "Keluar"
-    let log = JSON.parse(localStorage.getItem('scanLog') || '[]');
+    const CAM = document.getElementById('camera');
+    const LOG = document.getElementById('log');
+    let log = JSON.parse(localStorage.getItem('scanLog')||'[]');
+    let lastScan = 0, mode=null, track=null;
 
-    function updateLogUI() {
-      LOGEL.textContent = log.map(e => e.time + ' | ' + e.mode + ' | ' + e.code).join('\n');
+    function updateLog(){
+      LOG.textContent = log.join('\n');
+      localStorage.setItem('scanLog', JSON.stringify(log));
     }
+    updateLog();
 
-    updateLogUI();
+    function beep(){
+      const ctx=new (window.AudioContext||window.webkitAudioContext)();
+      const osc=ctx.createOscillator();
+      osc.type='sine';
+      osc.frequency.setValueAtTime(1000,ctx.currentTime);
+      osc.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 0.1);
+    } // suara beep :contentReference[oaicite:7]{index=7}
 
-    function startScanner(mode) {
-      currentMode = mode;
+    function startScanner(m){
+      mode=m;
       Quagga.init({
-        inputStream: {
-          target: CAMERA,
-          type: 'LiveStream',
-          constraints: { facingMode: 'environment' }
-        },
-        decoder: { readers: ['code_128_reader','ean_reader'] }
-      }, err => {
-        if (err) return alert(err);
+        inputStream:{target:CAM,type:'LiveStream',constraints:{facingMode:'environment'}},
+        decoder:{readers:['code_128_reader','ean_reader']}
+      }, e=>{
+        if(e) return alert(e);
         Quagga.start();
+        track = Quagga.CameraAccess.getActiveTrack();
       });
     }
 
-    Quagga.onDetected(result => {
-      const now = Date.now();
-      if (!currentMode) return;
-      if (now - lastScanTime < 3000) return; // throttle 3 detik
-      lastScanTime = now;
-
-      const code = result.codeResult.code;
-      const entry = { time: new Date().toLocaleString(), mode: currentMode, code };
-      log.push(entry);
-      localStorage.setItem('scanLog', JSON.stringify(log));
-      updateLogUI();
-      alert(`${currentMode} berhasil: ${code}`);
+    Quagga.onDetected(res=>{
+      const now=Date.now();
+      if(!mode|| now-lastScan<3000) return;
+      lastScan=now;
+      const code=res.codeResult.code;
+      beep();
+      log.push(code);
+      updateLog();
+      alert(`${mode}: ${code}`);
     });
 
-    document.getElementById('btnMasuk').addEventListener('click', () => startScanner('Masuk'));
-    document.getElementById('btnKeluar').addEventListener('click', () => startScanner('Keluar'));
+    document.getElementById('btnMasuk').onclick=()=>startScanner('Masuk');
+    document.getElementById('btnKeluar').onclick=()=>startScanner('Keluar');
 
-    document.getElementById('btnKirimWA').addEventListener('click', () => {
-      const text = log.map(e => `${e.time} | ${e.mode} | ${e.code}`).join('\n');
-      const waLink = `https://wa.me/YOURPHONENUMBER?text=${encodeURIComponent(text)}`;
-      window.open(waLink, '_blank');
-    });
+    document.getElementById('btnTorch').onclick=()=>{
+      if(!track) return alert('Mulai scanner dulu');
+      const cap=track.getCapabilities();
+      if(cap.torch){
+        const on = track.getSettings().torch;
+        track.applyConstraints({advanced:[{torch:!on}]});
+      } else alert('Torch tidak tersedia');
+    }; // toggle lampu :contentReference[oaicite:8]{index=8}
 
-    document.getElementById('btnClear').addEventListener('click', () => {
-      if (confirm('Yakin hapus semua laporan?')) {
-        log = [];
-        localStorage.removeItem('scanLog');
-        updateLogUI();
+    document.getElementById('btnKirimWA').onclick=()=>{
+      const text=log.join('\n')||'Laporan kosong';
+      window.open(`https://wa.me/YOURPHONENUMBER?text=${encodeURIComponent(text)}`, '_blank');
+    };
+
+    document.getElementById('btnCopy').onclick=()=>{
+      navigator.clipboard.writeText(log.join('\n')).then(()=>alert('Tersalin!'));
+    };
+
+    document.getElementById('btnClear').onclick=()=>{
+      if(confirm('Hapus semua laporan?')){
+        log=[]; updateLog();
       }
-    });
+    };
   </script>
-
 </body>
 </html>
