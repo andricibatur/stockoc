@@ -1,130 +1,259 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>Barcode Scanner gg</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://unpkg.com/html5-qrcode@2.2.7/minified/html5-qrcode.min.js"></script>
+  <title>Scanner Barcode</title>
   <style>
     body {
       font-family: sans-serif;
-      margin: 0;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
     }
     #reader {
       width: 100%;
       max-width: 400px;
-      position: relative;
+      margin: 0 auto;
+      border: 2px solid #ddd;
     }
-    #overlay {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 60%;
-      height: 40%;
-      transform: translate(-50%, -50%);
-      border: 2px solid limegreen;
-      pointer-events: none;
-      z-index: 1;
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+      border-radius: 5px;
     }
-    #controls {
+    .button-group {
+      margin: 20px 0;
       display: flex;
       flex-wrap: wrap;
-      justify-content: center;
       gap: 10px;
-      margin-top: 10px;
+      justify-content: center;
     }
     button {
       padding: 10px 15px;
-      font-size: 14px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #45a049;
     }
     #log {
-      margin-top: 10px;
-      width: 100%;
-      max-width: 400px;
-      background: #f4f4f4;
-      padding: 10px;
-      height: 150px;
+      margin-top: 20px;
+      max-height: 200px;
       overflow-y: auto;
-      white-space: pre-wrap;
+      padding: 10px;
+      border: 1px solid #ddd;
+      background: #f5f5f5;
+    }
+    .log-entry {
+      margin-bottom: 5px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #eee;
+    }
+    .timestamp {
+      color: #666;
+      font-size: 0.8em;
     }
   </style>
 </head>
 <body>
 
-<h2>Barcode Scanner gg</h2>
-<div id="reader"></div>
-<div id="overlay"></div>
+  <h2 style="text-align: center;">Scanner Barcode dd</h2>
+  
+  <div id="reader"></div>
+  
+  <div class="button-group">
+    <button id="startBtn">Mulai Scan</button>
+    <button id="stopBtn" disabled>Stop Scan</button>
+    <button id="torchBtn" disabled>Lampu</button>
+    <button id="waBtn">Kirim WA</button>
+  </div>
+  
+  <div id="result">Hasil scan akan muncul di sini</div>
+  
+  <h3>Riwayat Scan:</h3>
+  <div id="log"></div>
 
-<div id="controls">
-  <button id="btnMasuk">Scan Masuk</button>
-  <button id="btnKeluar">Scan Keluar</button>
-  <button id="btnCopy">Copy</button>
-  <button id="btnClear">Clear</button>
-</div>
-
-<h3>Laporan</h3>
-<div id="log"></div>
-
-<script type="module">
-  import { Html5Qrcode } from "https://unpkg.com/html5-qrcode?module";
-
-  const logBox = document.getElementById('log');
-  const html5QrCode = new Html5Qrcode("reader");
-  let log = JSON.parse(localStorage.getItem('scanLog') || '[]');
-  let lastScan = 0;
-  let currentMode = null;
-
-  const updateLog = () => {
-    logBox.textContent = log.join('\n');
-    localStorage.setItem('scanLog', JSON.stringify(log));
-  };
-
-  const beep = () => {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    osc.frequency.value = 1000;
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.1);
-  };
-
-  const startScan = (mode) => {
-    currentMode = mode;
-    lastScan = 0;
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 150 } },
-      (decodedText) => {
-        const now = Date.now();
-        if (now - lastScan > 3000) {
-          lastScan = now;
-          beep();
-          log.push(decodedText);
-          updateLog();
-          alert(`${mode}: ${decodedText}`);
-        }
+  <!-- Gunakan library html5-qrcode yang lebih stabil -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.4/html5-qrcode.min.js"></script>
+  <script>
+    const scanner = new Html5Qrcode("reader");
+    const resultDiv = document.getElementById('result');
+    const logDiv = document.getElementById('log');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const torchBtn = document.getElementById('torchBtn');
+    const waBtn = document.getElementById('waBtn');
+    
+    let scanHistory = JSON.parse(localStorage.getItem('scanHistory')) || [];
+    let isScanning = false;
+    
+    // Update log display
+    function updateLog() {
+      logDiv.innerHTML = scanHistory.map(entry => 
+        `<div class="log-entry">
+          <div><strong>${entry.text}</strong></div>
+          <div class="timestamp">${entry.time} - ${entry.date}</div>
+        </div>`
+      ).join('');
+      localStorage.setItem('scanHistory', JSON.stringify(scanHistory));
+    }
+    updateLog();
+    
+    // Beep sound
+    function playBeep() {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 800;
+      gainNode.gain.value = 0.5;
+      
+      oscillator.start();
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      oscillator.stop(audioCtx.currentTime + 0.5);
+    }
+    
+    // Start scanning
+    async function startScan() {
+      try {
+        // Konfigurasi scanner
+        const config = { 
+          fps: 10, 
+          qrbox: { width: 250, height: 100 },
+          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.CODE_39
+          ]
+        };
+        
+        // Mulai scanner
+        await scanner.start(
+          { facingMode: "environment" }, 
+          config,
+          onScanSuccess,
+          onScanError
+        );
+        
+        isScanning = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        torchBtn.disabled = false;
+        resultDiv.textContent = "Sedang memindai...";
+        
+      } catch (err) {
+        console.error("Gagal memulai scanner:", err);
+        resultDiv.textContent = "Error: " + err.message;
       }
-    );
-  };
-
-  document.getElementById('btnMasuk').onclick = () => startScan('Masuk');
-  document.getElementById('btnKeluar').onclick = () => startScan('Keluar');
-  document.getElementById('btnCopy').onclick = () => {
-    navigator.clipboard.writeText(log.join('\n')).then(() => alert('Tersalin!'));
-  };
-  document.getElementById('btnClear').onclick = () => {
-    if (confirm('Hapus semua laporan?')) {
-      log = [];
+    }
+    
+    // Stop scanning
+    async function stopScan() {
+      try {
+        await scanner.stop();
+        isScanning = false;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        torchBtn.disabled = true;
+        resultDiv.textContent = "Scanner dihentikan";
+      } catch (err) {
+        console.error("Gagal menghentikan scanner:", err);
+      }
+    }
+    
+    // Toggle torch/flash
+    async function toggleTorch() {
+      try {
+        const torchState = await scanner.getRunningTrackCapabilities()
+          .then(capabilities => capabilities.torch);
+        
+        if (torchState) {
+          await scanner.applyVideoConstraints({
+            advanced: [{ torch: !torchState.torch }]
+          });
+          torchBtn.textContent = torchState.torch ? "Nyalakan Lampu" : "Matikan Lampu";
+        } else {
+          alert("Perangkat tidak mendukung lampu/flash");
+        }
+      } catch (err) {
+        console.error("Gagal mengontrol lampu:", err);
+      }
+    }
+    
+    // Callback saat scan berhasil
+    function onScanSuccess(decodedText, decodedResult) {
+      playBeep();
+      
+      const now = new Date();
+      const timeString = now.toLocaleTimeString();
+      const dateString = now.toLocaleDateString();
+      
+      // Tambahkan ke riwayat
+      scanHistory.unshift({
+        text: decodedText,
+        time: timeString,
+        date: dateString
+      });
+      
+      // Batasi riwayat maksimal 50 item
+      if (scanHistory.length > 50) {
+        scanHistory.pop();
+      }
+      
+      // Update tampilan
+      resultDiv.innerHTML = `<strong>Hasil Scan:</strong> ${decodedText}`;
       updateLog();
     }
-  };
-
-  updateLog();
-</script>
-
+    
+    // Callback saat scan error
+    function onScanError(errorMessage) {
+      // Abaikan error umum (tidak menemukan kode)
+      if (!errorMessage.includes("NotFoundException")) {
+        console.warn("Scan error:", errorMessage);
+      }
+    }
+    
+    // Kirim hasil ke WhatsApp
+    function sendToWhatsApp() {
+      if (scanHistory.length === 0) {
+        alert("Tidak ada riwayat scan untuk dikirim");
+        return;
+      }
+      
+      const phoneNumber = ""; // Isi dengan nomor WhatsApp tujuan
+      const message = scanHistory.map(entry => 
+        `${entry.text} (${entry.date} ${entry.time})`
+      ).join("%0A");
+      
+      window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+    }
+    
+    // Event listeners
+    startBtn.addEventListener("click", startScan);
+    stopBtn.addEventListener("click", stopScan);
+    torchBtn.addEventListener("click", toggleTorch);
+    waBtn.addEventListener("click", sendToWhatsApp);
+    
+    // Bersihkan scanner saat halaman ditutup
+    window.addEventListener("beforeunload", () => {
+      if (isScanning) {
+        scanner.stop().catch(err => console.error(err));
+      }
+    });
+  </script>
 </body>
 </html>
