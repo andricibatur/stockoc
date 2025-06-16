@@ -26,7 +26,7 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      display: none; /* Awalnya disembunyikan sampai siap */
+      display: none;
     }
     #overlay {
       position: absolute;
@@ -135,7 +135,7 @@
     const btnCopy = document.getElementById('btnCopy');
     
     // Variabel state
-    let log = JSON.parse(localStorage.getItem('scanLog') || [];
+    let log = JSON.parse(localStorage.getItem('scanLog') || '[]');
     let lastScan = 0;
     let mode = null;
     let track = null;
