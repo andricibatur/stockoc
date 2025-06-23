@@ -20,7 +20,7 @@
   <label>Nama CS:</label>
   <input id="cs" placeholder="Contoh: Dafa">
   <label>Tanggal Kirim:</label>
-  <input id="tanggal" type="date">
+  <input id="tanggal" type="date" value="">
 
   <div id="reader" style="width:100%;max-width:400px;margin:auto;"></div>
   <p><strong>Pesanan:</strong> <span id="hasilScan" style="color:green;"></span></p>
@@ -66,6 +66,10 @@
           document.getElementById("sumber").value = d.sumber || ""
           document.getElementById("cs").value = d.cs || ""
           document.getElementById("tanggal").value = d.tanggal || ""
+        }
+        if (!d || !d.tanggal) {
+          const today = new Date().toISOString().split("T")[0]
+          document.getElementById("tanggal").value = today
         }
       }
     }
