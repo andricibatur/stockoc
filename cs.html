@@ -2,17 +2,18 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Scan Barcode Pengiriman</title>
+  <title>Scan Barcode Kamera</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body { font-family: sans-serif; padding: 10px; }
-    input, button, textarea { display: block; width: 100%; margin: 0.5rem 0; padding: 0.5rem; }
+    input, button, textarea { width: 100%; padding: 10px; margin: 5px 0; }
     textarea { height: 120px; }
-    #laporan { white-space: pre-wrap; background: #f0f0f0; padding: 1rem; border: 1px solid #ccc; }
+    #laporan { background: #eee; padding: 10px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h2>Form Pengiriman (Scan Barcode)</h2>
+  <h2>Form Pengiriman + Scan Barcode Kamera</h2>
 
   <label>Sumber:</label>
   <input id="sumber" placeholder="Contoh: Shopee">
@@ -20,13 +21,13 @@
   <label>Nama CS:</label>
   <input id="cs" placeholder="Contoh: Dafa">
 
-  <label>Pesanan (Scan Barcode):</label>
-  <input id="pesanan" placeholder="Scan barcode di sini" autofocus>
-
   <label>Tanggal Kirim:</label>
   <input id="tanggal" type="date">
 
-  <button onclick="tambah()">Tambah ke Laporan</button>
+  <div id="reader" style="width:100%;max-width:400px;margin:auto;"></div>
+  <p><strong>Pesanan:</strong> <span id="hasilScan" style="color:green;"></span></p>
+
+  <button onclick="mulaiScan()">Mulai Scan</button>
 
   <h3>Laporan</h3>
   <div id="laporan"></div>
@@ -35,7 +36,8 @@
   <button onclick="hapusLaporan()">Clear Laporan</button>
 
   <script>
-    let db
+    let db, html5QrCode, scanning = false
+
     const open = indexedDB.open("scan_pengiriman", 1)
     open.onupgradeneeded = () => open.result.createObjectStore("form", {keyPath: "key"})
     open.onsuccess = () => {
@@ -46,20 +48,17 @@
 
     function simpanForm() {
       const tx = db.transaction("form", "readwrite")
-      const store = tx.objectStore("form")
-      const formData = {
+      tx.objectStore("form").put({
         key: "form",
         sumber: document.getElementById("sumber").value,
         cs: document.getElementById("cs").value,
         tanggal: document.getElementById("tanggal").value
-      }
-      store.put(formData)
+      })
     }
 
     function muatForm() {
       const tx = db.transaction("form", "readonly")
-      const store = tx.objectStore("form")
-      const req = store.get("form")
+      const req = tx.objectStore("form").get("form")
       req.onsuccess = () => {
         const d = req.result
         if (d) {
@@ -70,23 +69,19 @@
       }
     }
 
-    function tambah() {
+    function tambahLaporan(pesanan) {
       const sumber = document.getElementById("sumber").value.trim()
       const cs = document.getElementById("cs").value.trim()
-      const pesanan = document.getElementById("pesanan").value.trim()
-      const tanggal = document.getElementById("tanggal").value
-
-      if (!sumber || !cs || !pesanan || !tanggal) {
-        alert("Semua field wajib diisi")
+      const tanggal = document.getElementById("tanggal").value.trim()
+      if (!sumber || !cs || !tanggal) {
+        alert("Isi semua form sebelum scan")
         return
       }
-
       const baris = `${sumber},${cs},${pesanan},${tanggal}`
-      const laporan = localStorage.getItem("laporan") || ""
-      const baru = laporan + (laporan ? "\n" : "") + baris
+      const lap = localStorage.getItem("laporan") || ""
+      const baru = lap + (lap ? "\n" : "") + baris
       localStorage.setItem("laporan", baru)
-
-      document.getElementById("pesanan").value = ""
+      document.getElementById("hasilScan").textContent = pesanan
       simpanForm()
       muatLaporan()
     }
@@ -97,22 +92,37 @@
 
     function kirimWA() {
       const isi = localStorage.getItem("laporan")
-      if (!isi) {
-        alert("Laporan kosong")
-        return
-      }
+      if (!isi) return alert("Laporan kosong")
       const pesan = encodeURIComponent(isi)
       const url = `https://wa.me/6281220001748?text=${pesan}`
       window.open(url, "_blank")
     }
 
     function hapusLaporan() {
-      if (!confirm("Hapus semua laporan setelah dikirim?")) return
-      localStorage.removeItem("laporan")
-      muatLaporan()
+      if (confirm("Hapus semua laporan?")) {
+        localStorage.removeItem("laporan")
+        muatLaporan()
+      }
     }
 
-    // Auto simpan form ketika diubah
+    async function mulaiScan() {
+      if (scanning) return
+      scanning = true
+      html5QrCode = new Html5Qrcode("reader")
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText, decodedResult) => {
+          if (decodedText) {
+            tambahLaporan(decodedText)
+            html5QrCode.pause()
+            setTimeout(() => html5QrCode.resume(), 3000) // jeda 3 detik
+          }
+        },
+        error => {}
+      )
+    }
+
     ["sumber", "cs", "tanggal"].forEach(id => {
       document.getElementById(id).addEventListener("input", simpanForm)
     })
