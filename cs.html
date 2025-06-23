@@ -2,25 +2,23 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Scan Barcode Kamera</title>
+  <title>Scan Barcode + Suara</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body { font-family: sans-serif; padding: 10px; }
     input, button, textarea { width: 100%; padding: 10px; margin: 5px 0; }
     textarea { height: 120px; }
-    #laporan { background: #eee; padding: 10px; white-space: pre-wrap; }
+    #laporan { background: #f0f0f0; padding: 10px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h2>Form Pengiriman + Scan Barcode Kamera</h2>
+  <h2>Scan Barcode Kamera + Suara</h2>
 
   <label>Sumber:</label>
   <input id="sumber" placeholder="Contoh: Shopee">
-
   <label>Nama CS:</label>
   <input id="cs" placeholder="Contoh: Dafa">
-
   <label>Tanggal Kirim:</label>
   <input id="tanggal" type="date">
 
@@ -34,6 +32,9 @@
 
   <button onclick="kirimWA()">Kirim ke WA Dafa</button>
   <button onclick="hapusLaporan()">Clear Laporan</button>
+
+  <!-- Suara bip -->
+  <audio id="bip" src="https://www.soundjay.com/buttons/sounds/beep-07.mp3" preload="auto"></audio>
 
   <script>
     let db, html5QrCode, scanning = false
@@ -82,6 +83,7 @@
       const baru = lap + (lap ? "\n" : "") + baris
       localStorage.setItem("laporan", baru)
       document.getElementById("hasilScan").textContent = pesanan
+      document.getElementById("bip").play()
       simpanForm()
       muatLaporan()
     }
@@ -116,7 +118,7 @@
           if (decodedText) {
             tambahLaporan(decodedText)
             html5QrCode.pause()
-            setTimeout(() => html5QrCode.resume(), 3000) // jeda 3 detik
+            setTimeout(() => html5QrCode.resume(), 3000)
           }
         },
         error => {}
