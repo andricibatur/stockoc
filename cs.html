@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Scan Barcode Pengiriman</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; padding: 10px; }
+    input, button, textarea { display: block; width: 100%; margin: 0.5rem 0; padding: 0.5rem; }
+    textarea { height: 120px; }
+    #laporan { white-space: pre-wrap; background: #f0f0f0; padding: 1rem; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h2>Form Pengiriman (Scan Barcode)</h2>
+
+  <label>Sumber:</label>
+  <input id="sumber" placeholder="Contoh: Shopee">
+
+  <label>Nama CS:</label>
+  <input id="cs" placeholder="Contoh: Dafa">
+
+  <label>Pesanan (Scan Barcode):</label>
+  <input id="pesanan" placeholder="Scan barcode di sini" autofocus>
+
+  <label>Tanggal Kirim:</label>
+  <input id="tanggal" type="date">
+
+  <button onclick="tambah()">Tambah ke Laporan</button>
+
+  <h3>Laporan</h3>
+  <div id="laporan"></div>
+
+  <button onclick="kirimWA()">Kirim ke WA Dafa</button>
+  <button onclick="hapusLaporan()">Clear Laporan</button>
+
+  <script>
+    let db
+    const open = indexedDB.open("scan_pengiriman", 1)
+    open.onupgradeneeded = () => open.result.createObjectStore("form", {keyPath: "key"})
+    open.onsuccess = () => {
+      db = open.result
+      muatForm()
+      muatLaporan()
+    }
+
+    function simpanForm() {
+      const tx = db.transaction("form", "readwrite")
+      const store = tx.objectStore("form")
+      const formData = {
+        key: "form",
+        sumber: document.getElementById("sumber").value,
+        cs: document.getElementById("cs").value,
+        tanggal: document.getElementById("tanggal").value
+      }
+      store.put(formData)
+    }
+
+    function muatForm() {
+      const tx = db.transaction("form", "readonly")
+      const store = tx.objectStore("form")
+      const req = store.get("form")
+      req.onsuccess = () => {
+        const d = req.result
+        if (d) {
+          document.getElementById("sumber").value = d.sumber || ""
+          document.getElementById("cs").value = d.cs || ""
+          document.getElementById("tanggal").value = d.tanggal || ""
+        }
+      }
+    }
+
+    function tambah() {
+      const sumber = document.getElementById("sumber").value.trim()
+      const cs = document.getElementById("cs").value.trim()
+      const pesanan = document.getElementById("pesanan").value.trim()
+      const tanggal = document.getElementById("tanggal").value
+
+      if (!sumber || !cs || !pesanan || !tanggal) {
+        alert("Semua field wajib diisi")
+        return
+      }
+
+      const baris = `${sumber},${cs},${pesanan},${tanggal}`
+      const laporan = localStorage.getItem("laporan") || ""
+      const baru = laporan + (laporan ? "\n" : "") + baris
+      localStorage.setItem("laporan", baru)
+
+      document.getElementById("pesanan").value = ""
+      simpanForm()
+      muatLaporan()
+    }
+
+    function muatLaporan() {
+      document.getElementById("laporan").textContent = localStorage.getItem("laporan") || ""
+    }
+
+    function kirimWA() {
+      const isi = localStorage.getItem("laporan")
+      if (!isi) {
+        alert("Laporan kosong")
+        return
+      }
+      const pesan = encodeURIComponent(isi)
+      const url = `https://wa.me/6281220001748?text=${pesan}`
+      window.open(url, "_blank")
+    }
+
+    function hapusLaporan() {
+      if (!confirm("Hapus semua laporan setelah dikirim?")) return
+      localStorage.removeItem("laporan")
+      muatLaporan()
+    }
+
+    // Auto simpan form ketika diubah
+    ["sumber", "cs", "tanggal"].forEach(id => {
+      document.getElementById(id).addEventListener("input", simpanForm)
+    })
+  </script>
+</body>
+</html>
