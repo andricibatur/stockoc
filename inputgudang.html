@@ -11,7 +11,6 @@
     th { background: #eee; }
     .filter-group { margin-bottom: 1em; }
     .filter-inline > * { margin-right: 0.5em; }
-    /* Animasi klip-klip */
     @keyframes blink {
       0% { background-color: #f7ff72; }
       50% { background-color: #fff; }
@@ -30,7 +29,6 @@
   </style>
 </head>
 <body>
-<!-- Tombol HOME ke halaman utama -->
 <div style="margin-bottom:1.5em; text-align:right;">
   <button onclick="window.location.href='index.html'" 
           style="background:linear-gradient(90deg,#e3f0ff,#c6dafc);color:#2957a4;border:1px solid #b6d2fa;border-radius:6px;padding:8px 22px;font-size:1rem;font-family:inherit;font-weight:500;cursor:pointer;box-shadow:0 2px 7px rgba(100,130,180,0.07);transition:background 0.18s,color 0.18s;">
@@ -38,250 +36,187 @@
   </button>
 </div>
   
-  <h2>Aplikasi Kode Barang (Input/Output)</h2>
+<h2>Aplikasi Kode Barang (Input/Output)</h2>
 
-  <div class="container">
-    <label>Input Kode Barang Masuk:</label><br>
-    <textarea id="kodeMasuk" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
-    <button onclick="simpanMasuk()">Simpan Masuk</button>
+<div class="container">
+  <label>Input Kode Barang Masuk:</label><br>
+  <textarea id="kodeMasuk" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
+  <button onclick="simpanMasuk()">Simpan Masuk</button>
+</div>
+
+<div class="container">
+  <label>Input Kode Barang Keluar:</label><br>
+  <textarea id="kodeKeluar" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
+  <button onclick="simpanKeluar()">Simpan Keluar</button>
+</div>
+
+<div class="container filter-group">
+  <div class="filter-inline">
+    <label>Filter: </label>
+    <select id="filterMode" onchange="onFilterChange()">
+      <option value="semua">Semua</option>
+      <option value="harian">Harian</option>
+      <option value="mingguan">Mingguan</option>
+      <option value="terbanyak">Terbanyak</option>
+      <option value="tidaklaku">Tidak Laku</option>
+    </select>
+    <input type="date" id="filterDate" style="display:none" onchange="tampilkanLaporan()" />
+    <button onclick="tampilkanLaporan()">Terapkan Filter</button>
+    <button onclick="exportCSV()">Export CSV</button>
+    <button id="syncBtn" onclick="syncToSheet()">Sinkron ke Google Sheet</button>
   </div>
+  <span id="syncInfo" style="color:#b19c00;margin-left:1em"></span>
+</div>
 
-  <div class="container">
-    <label>Input Kode Barang Keluar:</label><br>
-    <textarea id="kodeKeluar" rows="4" cols="40" placeholder="Satu kode per baris"></textarea><br>
-    <button onclick="simpanKeluar()">Simpan Keluar</button>
-  </div>
+<div class="container">
+  <button onclick="tampilkanLaporan()">Tampilkan Laporan</button>
+  <button onclick="exportData()">Export Data (JSON)</button>
+  <input type="file" id="importFile" style="display:none" onchange="importData(event)"/>
+  <button onclick="document.getElementById('importFile').click()">Import Data (JSON)</button>
+</div>
 
-  <div class="container filter-group">
-    <div class="filter-inline">
-      <label>Filter: </label>
-      <select id="filterMode" onchange="onFilterChange()">
-        <option value="semua">Semua</option>
-        <option value="harian">Harian</option>
-        <option value="mingguan">Mingguan</option>
-        <option value="terbanyak">Terbanyak</option>
-        <option value="tidaklaku">Tidak Laku</option>
-      </select>
-      <input type="date" id="filterDate" style="display:none" onchange="tampilkanLaporan()" />
-      <button onclick="tampilkanLaporan()">Terapkan Filter</button>
-      <button onclick="exportCSV()">Export CSV</button>
-      <button id="syncBtn" onclick="syncToSheetDB()">Sinkron ke Google Sheet</button>
-    </div>
-    <span id="syncInfo" style="color:#b19c00;margin-left:1em"></span>
-  </div>
+<div class="container">
+  <h3>Laporan Barang</h3>
+  <div id="laporan"></div>
+</div>
 
-  <div class="container">
-    <button onclick="tampilkanLaporan()">Tampilkan Laporan</button>
-    <button onclick="exportData()">Export Data (JSON)</button>
-    <input type="file" id="importFile" style="display:none" onchange="importData(event)"/>
-    <button onclick="document.getElementById('importFile').click()">Import Data (JSON)</button>
-  </div>
+<script>
+  const dbName = 'AplikasiBarang';
+  const masukStore = 'masuk';
+  const keluarStore = 'keluar';
+  const SYNC_COUNTER_KEY = 'syncCounter';
+  const SYNC_TRIGGER = 30;
+  let syncTriggered = false;
+  let db;
+  let lastReportData = [];
 
-  <div class="container">
-    <h3>Laporan Barang</h3>
-    <div id="laporan"></div>
-  </div>
+  const GOOGLE_APPS_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzmHQBIPcIJTcl59eVdfPKYsWii--PFRhvzNlFP2_lfVSjcucVf2X7qy33LJcNpY8QYog/exec';
 
-  <script>
-    // IndexedDB Setup
-    const dbName = 'AplikasiBarang';
-    const masukStore = 'masuk';
-    const keluarStore = 'keluar';
-    let db;
-    let lastReportData = []; // untuk export CSV dan sync Google Sheet
-
-    // SheetDB API Endpoint
-    const SHEETDB_API = 'https://sheetdb.io/api/v1/8l3pk21z7kq20';
-
-    // Counter transaksi yang belum di-sync
-    const SYNC_COUNTER_KEY = 'syncCounter';
-    const SYNC_TRIGGER = 30;
-    let syncTriggered = false; // true jika tombol sync sudah ditekan (reset setelah sync)
-
-    // --- Util Counter
-    function getSyncCounter() {
-      return parseInt(localStorage.getItem(SYNC_COUNTER_KEY) || "0", 10);
+  function getSyncCounter() {
+    return parseInt(localStorage.getItem(SYNC_COUNTER_KEY) || "0", 10);
+  }
+  function setSyncCounter(val) {
+    localStorage.setItem(SYNC_COUNTER_KEY, val);
+  }
+  function resetSyncCounter() {
+    setSyncCounter(0);
+    syncTriggered = false;
+    updateSyncButton();
+  }
+  function incSyncCounter(by = 1) {
+    let v = getSyncCounter();
+    v += by;
+    setSyncCounter(v);
+    updateSyncButton();
+  }
+  function updateSyncButton() {
+    const btn = document.getElementById('syncBtn');
+    const info = document.getElementById('syncInfo');
+    const counter = getSyncCounter();
+    if (counter >= SYNC_TRIGGER && !syncTriggered) {
+      btn.classList.add('blink');
+      btn.classList.remove('disabled');
+      btn.disabled = false;
+      info.innerText = `Belum disinkron: ${counter} transaksi.`;
+    } else if (syncTriggered) {
+      btn.classList.remove('blink');
+      btn.classList.add('disabled');
+      btn.disabled = true;
+      info.innerText = 'Sudah disinkron.';
+    } else {
+      btn.classList.remove('blink');
+      btn.classList.remove('disabled');
+      btn.disabled = false;
+      info.innerText = '';
     }
-    function setSyncCounter(val) {
-      localStorage.setItem(SYNC_COUNTER_KEY, val);
-    }
-    function resetSyncCounter() {
-      setSyncCounter(0);
-      syncTriggered = false;
-      updateSyncButton();
-    }
-    function incSyncCounter(by = 1) {
-      let v = getSyncCounter();
-      v += by;
-      setSyncCounter(v);
-      updateSyncButton();
-    }
+  }
 
-    function updateSyncButton() {
-      const btn = document.getElementById('syncBtn');
-      const info = document.getElementById('syncInfo');
-      const counter = getSyncCounter();
-      if (counter >= SYNC_TRIGGER && !syncTriggered) {
-        btn.classList.add('blink');
-        btn.classList.remove('disabled');
-        btn.disabled = false;
-        info.innerText = `Transaksi belum di-sync: ${counter}. Segera sinkron!`;
-      } else if (syncTriggered) {
-        btn.classList.remove('blink');
-        btn.classList.add('disabled');
-        btn.disabled = true;
-        info.innerText = 'Sudah sinkron, silakan input data lagi.';
-      } else {
-        btn.classList.remove('blink');
-        btn.classList.remove('disabled');
-        btn.disabled = false;
-        info.innerText = '';
-      }
-    }
+  function bukaDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(dbName, 2);
+      req.onupgradeneeded = e => {
+        db = e.target.result;
+        if (!db.objectStoreNames.contains(masukStore)) {
+          db.createObjectStore(masukStore, { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains(keluarStore)) {
+          db.createObjectStore(keluarStore, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+      req.onsuccess = e => { db = e.target.result; resolve(db); };
+      req.onerror = e => reject(e.target.error);
+    });
+  }
 
-    function bukaDB() {
+  function simpanKeStore(storeName, kodeList) {
+    return bukaDB().then(db => {
       return new Promise((resolve, reject) => {
-        const req = indexedDB.open(dbName, 2);
-        req.onupgradeneeded = e => {
-          db = e.target.result;
-          if (!db.objectStoreNames.contains(masukStore)) {
-            db.createObjectStore(masukStore, { keyPath: 'id', autoIncrement: true });
-          }
-          if (!db.objectStoreNames.contains(keluarStore)) {
-            db.createObjectStore(keluarStore, { keyPath: 'id', autoIncrement: true });
-          }
-        };
-        req.onsuccess = e => { db = e.target.result; resolve(db); };
+        const tx = db.transaction([storeName], 'readwrite');
+        const store = tx.objectStore(storeName);
+        const now = new Date();
+        kodeList.forEach(kode => {
+          store.add({ kode: kode.trim(), waktu: now.toISOString() });
+        });
+        tx.oncomplete = resolve;
+        tx.onerror = e => reject(e.target.error);
+      });
+    });
+  }
+
+  function simpanMasuk() {
+    const raw = document.getElementById('kodeMasuk').value.trim();
+    if (!raw) return alert('Input kosong!');
+    const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
+    simpanKeStore(masukStore, kodeList).then(() => {
+      alert('Disimpan!');
+      document.getElementById('kodeMasuk').value = '';
+      incSyncCounter(kodeList.length);
+    });
+  }
+
+  function simpanKeluar() {
+    const raw = document.getElementById('kodeKeluar').value.trim();
+    if (!raw) return alert('Input kosong!');
+    const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
+    simpanKeStore(keluarStore, kodeList).then(() => {
+      alert('Disimpan!');
+      document.getElementById('kodeKeluar').value = '';
+      incSyncCounter(kodeList.length);
+    });
+  }
+
+  function ambilSemua(storeName) {
+    return bukaDB().then(db => {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([storeName], 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result);
         req.onerror = e => reject(e.target.error);
       });
-    }
+    });
+  }
 
-    function simpanKeStore(storeName, kodeList) {
-      return bukaDB().then(db => {
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction([storeName], 'readwrite');
-          const store = tx.objectStore(storeName);
-          const now = new Date();
-          kodeList.forEach(kode => {
-            store.add({ kode: kode.trim(), waktu: now.toISOString() });
-          });
-          tx.oncomplete = resolve;
-          tx.onerror = e => reject(e.target.error);
-        });
-      });
-    }
-
-    function simpanMasuk() {
-      const raw = document.getElementById('kodeMasuk').value.trim();
-      if (!raw) return alert('Input kode barang masuk kosong!');
-      const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
-      simpanKeStore(masukStore, kodeList).then(() => {
-        alert('Berhasil disimpan!');
-        document.getElementById('kodeMasuk').value = '';
-        incSyncCounter(kodeList.length);
-      });
-    }
-
-    function simpanKeluar() {
-      const raw = document.getElementById('kodeKeluar').value.trim();
-      if (!raw) return alert('Input kode barang keluar kosong!');
-      const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
-      simpanKeStore(keluarStore, kodeList).then(() => {
-        alert('Berhasil disimpan!');
-        document.getElementById('kodeKeluar').value = '';
-        incSyncCounter(kodeList.length);
-      });
-    }
-
-    function ambilSemua(storeName) {
-      return bukaDB().then(db => {
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction([storeName], 'readonly');
-          const store = tx.objectStore(storeName);
-          const req = store.getAll();
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = e => reject(e.target.error);
-        });
-      });
-    }
-
-    function filterByDate(data, tanggal, rentangHari = 1) {
-      // tanggal format yyyy-mm-dd
-      const dateObj = new Date(tanggal);
-      let start = new Date(dateObj.setHours(0,0,0,0));
-      let end = new Date(start);
-      end.setDate(end.getDate() + rentangHari);
-      return data.filter(item => {
-        const t = new Date(item.waktu);
-        return t >= start && t < end;
-      });
-    }
-
-    function onFilterChange() {
-      const mode = document.getElementById('filterMode').value;
-      document.getElementById('filterDate').style.display = (mode === 'harian' || mode === 'mingguan') ? '' : 'none';
-    }
-
-    async function tampilkanLaporan() {
-      const masuk = await ambilSemua(masukStore);
-      const keluar = await ambilSemua(keluarStore);
-      const filterMode = document.getElementById('filterMode').value;
-      const filterDate = document.getElementById('filterDate').value;
-      let masukFiltered = masuk, keluarFiltered = keluar;
-
-      // FILTER DATA
-      if (filterMode === 'harian' && filterDate) {
-        masukFiltered = filterByDate(masuk, filterDate, 1);
-        keluarFiltered = filterByDate(keluar, filterDate, 1);
-      } else if (filterMode === 'mingguan' && filterDate) {
-        masukFiltered = filterByDate(masuk, filterDate, 7);
-        keluarFiltered = filterByDate(keluar, filterDate, 7);
-      }
-
-      // Hitung masuk per kode
-      const masukCount = {};
-      for (const { kode } of masukFiltered) {
-        if (!masukCount[kode]) masukCount[kode] = 0;
-        masukCount[kode]++;
-      }
-      // Hitung keluar per kode
-      const keluarCount = {};
-      for (const { kode } of keluarFiltered) {
-        if (!keluarCount[kode]) keluarCount[kode] = 0;
-        keluarCount[kode]++;
-      }
+  function tampilkanLaporan() {
+    Promise.all([ambilSemua(masukStore), ambilSemua(keluarStore)]).then(([masuk, keluar]) => {
+      const masukCount = {}, keluarCount = {};
+      masuk.forEach(x => masukCount[x.kode] = (masukCount[x.kode] || 0) + 1);
+      keluar.forEach(x => keluarCount[x.kode] = (keluarCount[x.kode] || 0) + 1);
       const semuaKode = Array.from(new Set([...Object.keys(masukCount), ...Object.keys(keluarCount)]));
-
-      // Gabung data
-      let dataReport = semuaKode.map(kode => ({
-        kode,
-        masuk: masukCount[kode] || 0,
-        keluar: keluarCount[kode] || 0,
-        sisa: (masukCount[kode] || 0) - (keluarCount[kode] || 0)
+      lastReportData = semuaKode.map(kode => ({
+        kode, masuk: masukCount[kode] || 0, keluar: keluarCount[kode] || 0, sisa: (masukCount[kode] || 0) - (keluarCount[kode] || 0)
       }));
-
-      // Filter tambahan
-      if (filterMode === 'terbanyak') {
-        dataReport = dataReport.sort((a, b) => b.sisa - a.sisa).slice(0, 10);
-      }
-      if (filterMode === 'tidaklaku') {
-        dataReport = dataReport.filter(d => d.sisa <= 0);
-      }
-
-      // Tabel HTML
-      let html = '<table><tr><th>Kode Barang</th><th>Masuk</th><th>Keluar</th><th>Sisa</th></tr>';
-      dataReport.forEach(row => {
-        html += `<tr><td>${row.kode}</td><td>${row.masuk}</td><td>${row.keluar}</td><td>${row.sisa}</td></tr>`;
+      let html = '<table><tr><th>Kode</th><th>Masuk</th><th>Keluar</th><th>Sisa</th></tr>';
+      lastReportData.forEach(r => {
+        html += `<tr><td>${r.kode}</td><td>${r.masuk}</td><td>${r.keluar}</td><td>${r.sisa}</td></tr>`;
       });
       html += '</table>';
       document.getElementById('laporan').innerHTML = html;
-      lastReportData = dataReport; // simpan untuk export csv dan sync Google Sheet
-    }
+    });
+  }
 
-    // Export/import JSON
-    async function exportData() {
-      const masuk = await ambilSemua(masukStore);
-      const keluar = await ambilSemua(keluarStore);
+  function exportData() {
+    Promise.all([ambilSemua(masukStore), ambilSemua(keluarStore)]).then(([masuk, keluar]) => {
       const jsonData = JSON.stringify({ masuk, keluar }, null, 2);
       const blob = new Blob([jsonData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -290,120 +225,96 @@
       a.download = 'data-barang.json';
       a.click();
       URL.revokeObjectURL(url);
-    }
+    });
+  }
 
-    async function importData(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async function(e) {
-        try {
-          const data = JSON.parse(e.target.result);
-          if (!data.masuk || !data.keluar) throw new Error('Format file salah!');
-          await bukaDB();
-          await hapusSemua(masukStore);
-          await hapusSemua(keluarStore);
-          await simpanBatch(masukStore, data.masuk);
-          await simpanBatch(keluarStore, data.keluar);
-          alert('Import berhasil!');
-        } catch (err) {
-          alert('Gagal import: ' + err.message);
-        }
-      };
-      reader.readAsText(file);
-      event.target.value = '';
-    }
+  function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const data = JSON.parse(e.target.result);
+      await bukaDB();
+      await hapusSemua(masukStore);
+      await hapusSemua(keluarStore);
+      await simpanBatch(masukStore, data.masuk);
+      await simpanBatch(keluarStore, data.keluar);
+      alert('Import berhasil!');
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }
 
-    function hapusSemua(storeName) {
-      return bukaDB().then(db => {
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction([storeName], 'readwrite');
-          const store = tx.objectStore(storeName);
-          store.clear();
-          tx.oncomplete = resolve;
-          tx.onerror = e => reject(e.target.error);
-        });
+  function hapusSemua(storeName) {
+    return bukaDB().then(db => {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([storeName], 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.clear();
+        tx.oncomplete = resolve;
+        tx.onerror = e => reject(e.target.error);
       });
-    }
+    });
+  }
 
-    function simpanBatch(storeName, dataArr) {
-      return bukaDB().then(db => {
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction([storeName], 'readwrite');
-          const store = tx.objectStore(storeName);
-          dataArr.forEach(data => {
-            store.add({ kode: data.kode, waktu: data.waktu });
-          });
-          tx.oncomplete = resolve;
-          tx.onerror = e => reject(e.target.error);
-        });
+  function simpanBatch(storeName, dataArr) {
+    return bukaDB().then(db => {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([storeName], 'readwrite');
+        const store = tx.objectStore(storeName);
+        dataArr.forEach(data => store.add(data));
+        tx.oncomplete = resolve;
+        tx.onerror = e => reject(e.target.error);
       });
-    }
+    });
+  }
 
-    // Export CSV
-    function exportCSV() {
-      if (!lastReportData.length) {
-        alert('Tampilkan laporan dulu sebelum ekspor CSV!');
-        return;
-      }
-      let csv = "Kode Barang,Masuk,Keluar,Sisa\n";
-      lastReportData.forEach(row => {
-        csv += `"${row.kode}",${row.masuk},${row.keluar},${row.sisa}\n`;
-      });
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'laporan-barang.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+  function exportCSV() {
+    if (!lastReportData.length) return alert('Tampilkan laporan dulu!');
+    let csv = "Kode,Masuk,Keluar,Sisa\n";
+    lastReportData.forEach(row => {
+      csv += `"${row.kode}",${row.masuk},${row.keluar},${row.sisa}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'laporan-barang.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
-    // Sinkronisasi ke Google Sheet via SheetDB API
-    function syncToSheetDB() {
-      if (!lastReportData.length) {
-        alert('Tampilkan laporan dulu sebelum sinkron!');
-        return;
-      }
-      // SheetDB menerima format: { data: [ {kode:..., masuk:..., keluar:..., sisa:...}, ... ] }
-      const btn = document.getElementById('syncBtn');
-      btn.disabled = true;
-      btn.classList.remove('blink');
-      btn.classList.add('disabled');
-      document.getElementById('syncInfo').innerText = 'Sinkronisasi sedang berlangsung...';
-      fetch(SHEETDB_API + "?sheet=Sheet1", {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ data: lastReportData })
-      })
-      .then(r => r.json())
-      .then(res => {
-        if (res && res.created) {
-          alert('Sinkronisasi ke Google SheetDB berhasil!');
-          syncTriggered = true;
-          resetSyncCounter();
-        } else {
-          alert('Sinkron ke Google SheetDB GAGAL! (Cek format sheetnya)');
-          syncTriggered = false;
-          updateSyncButton();
-        }
-      })
-      .catch(e => {
-        alert('Gagal sinkron ke Google SheetDB: ' + e);
-        syncTriggered = false;
-        updateSyncButton();
-      });
-    }
+  function syncToSheet() {
+    if (!lastReportData.length) return alert('Tampilkan laporan dulu!');
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true;
+    btn.classList.remove('blink');
+    btn.classList.add('disabled');
+    document.getElementById('syncInfo').innerText = 'Sinkronisasi...';
 
-    // Inisialisasi
-    bukaDB().then(() => {
+    fetch(GOOGLE_APPS_SCRIPT_WEBAPP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: lastReportData })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status === "success") {
+        alert(`Sinkronisasi berhasil! (${res.count})`);
+        syncTriggered = true;
+        resetSyncCounter();
+      } else throw new Error("Format respon tidak dikenali");
+    })
+    .catch(e => {
+      alert('Gagal sync: ' + e.message);
+      syncTriggered = false;
       updateSyncButton();
     });
-    document.getElementById('filterMode').addEventListener('change', onFilterChange);
+  }
 
-    // Pastikan update tombol setiap reload
-    window.addEventListener('DOMContentLoaded', updateSyncButton);
-
-  </script>
+  document.addEventListener('DOMContentLoaded', () => {
+    bukaDB().then(() => updateSyncButton());
+  });
+</script>
 </body>
 </html>
