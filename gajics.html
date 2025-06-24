@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Laporan CS - Cocok Pesanan</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: sans-serif; padding: 10px; }
+    textarea, select, button { width: 100%; margin: 5px 0; padding: 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    th { background: #f0f0f0; }
+    .berhasil { background-color: #d4edda; }
+    .gagal { background-color: #f8d7da; }
+  </style>
+</head>
+<body>
+  <h2>Cocok Data CS</h2>
+
+  <label>Data Sumber (CSV: Sumber, Nama CS, No Pesanan, Tanggal)</label>
+  <textarea id="sumber"></textarea>
+
+  <label>No Pesanan Berhasil (pisah enter)</label>
+  <textarea id="berhasil"></textarea>
+
+  <label>No Pesanan Gagal (pisah enter)</label>
+  <textarea id="gagal"></textarea>
+
+  <button onclick="proses()">🔍 Proses & Simpan</button>
+
+  <label>Filter Bulan (YYYY-MM)</label>
+  <input type="month" id="filterBulan" onchange="tampilkanLaporan()" />
+
+  <div id="laporan"></div>
+
+  <script>
+    const DB_NAME = "LaporanCS_DB";
+    const STORE_NAME = "laporan";
+    let db, hasilGlobal = {};
+
+    // IndexedDB setup
+    const bukaDB = () => new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        db.createObjectStore(STORE_NAME, { keyPath: 'cs' });
+      };
+      req.onsuccess = e => { db = e.target.result; res(); };
+      req.onerror = e => rej(e);
+    });
+
+    const simpanKeDB = (data) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      Object.keys(data).forEach(cs => store.put({ cs, data: data[cs] }));
+    };
+
+    const ambilSemua = () => new Promise((res, rej) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const hasil = {};
+        req.result.forEach(item => hasil[item.cs] = item.data);
+        hasilGlobal = hasil;
+        res();
+      };
+      req.onerror = rej;
+    });
+
+    function proses() {
+      const sumberText = document.getElementById("sumber").value.trim();
+      const berhasil = document.getElementById("berhasil").value.trim().split('\n').map(s => s.trim());
+      const gagal = document.getElementById("gagal").value.trim().split('\n').map(s => s.trim());
+
+      const rows = sumberText.split('\n').map(row => row.split(',').map(cell => cell.trim()));
+      const header = rows.shift();
+      const index = {
+        sumber: header.indexOf("Sumber"),
+        cs: header.indexOf("Nama CS"),
+        no: header.indexOf("No Pesanan"),
+        tgl: header.indexOf("Tanggal")
+      };
+
+      const perCS = {};
+      rows.forEach(row => {
+        const cs = row[index.cs];
+        const no = row[index.no];
+        const tgl = row[index.tgl];
+        const status = berhasil.includes(no) ? 'berhasil' : gagal.includes(no) ? 'gagal' : 'tidak ditemukan';
+        if (!perCS[cs]) perCS[cs] = [];
+        perCS[cs].push({ no, tgl, status });
+      });
+
+      hasilGlobal = perCS;
+      simpanKeDB(perCS);
+      tampilkanLaporan();
+    }
+
+    function tampilkanLaporan() {
+      const bulan = document.getElementById("filterBulan").value;
+      let html = '';
+      for (const cs in hasilGlobal) {
+        const entri = hasilGlobal[cs].filter(e => !bulan || e.tgl.startsWith(bulan));
+        if (entri.length === 0) continue;
+        const total = entri.length;
+        const sukses = entri.filter(e => e.status === "berhasil").length;
+        const gagal = entri.filter(e => e.status === "gagal").length;
+
+        html += `<h3>${cs} (✔️ ${sukses} / ❌ ${gagal})</h3>`;
+        html += `<button onclick="cetakPDF('${cs}')">🖨 Cetak PDF</button>
+                 <button onclick="exportCSV('${cs}')">⬇ Export CSV</button>`;
+        html += `<table><tr><th>No Pesanan</th><th>Tanggal</th><th>Status</th></tr>`;
+        entri.forEach(e => {
+          html += `<tr class="${e.status}"><td>${e.no}</td><td>${e.tgl}</td><td>${e.status}</td></tr>`;
+        });
+        html += `</table><hr/>`;
+      }
+      document.getElementById("laporan").innerHTML = html;
+    }
+
+    function cetakPDF(cs) {
+      const data = hasilGlobal[cs].filter(e => {
+        const bulan = document.getElementById("filterBulan").value;
+        return !bulan || e.tgl.startsWith(bulan);
+      });
+      const tgl = new Date().toISOString().substring(0, 10);
+      const win = window.open('', '_blank');
+      win.document.write(`<html><head><title>${cs}</title></head><body>`);
+      win.document.write(`<h2>Laporan ${cs} - ${tgl}</h2><table border="1"><tr><th>No</th><th>Tanggal</th><th>Status</th></tr>`);
+      data.forEach(e => win.document.write(`<tr><td>${e.no}</td><td>${e.tgl}</td><td>${e.status}</td></tr>`));
+      win.document.write(`</table></body></html>`);
+      win.document.close(); win.print();
+    }
+
+    function exportCSV(cs) {
+      const data = hasilGlobal[cs].filter(e => {
+        const bulan = document.getElementById("filterBulan").value;
+        return !bulan || e.tgl.startsWith(bulan);
+      });
+      let csv = "No Pesanan,Tanggal,Status\n";
+      data.forEach(e => csv += `"${e.no}","${e.tgl}","${e.status}"\n`);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Laporan-${cs}.csv`;
+      a.click();
+    }
+
+    window.onload = async () => {
+      await bukaDB();
+      await ambilSemua();
+      tampilkanLaporan();
+    };
+  </script>
+</body>
+</html>
