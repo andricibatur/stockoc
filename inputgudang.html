@@ -139,16 +139,18 @@
     });
   }
 
-  function simpanMasuk() {
-    const raw = document.getElementById('kodeMasuk').value.trim();
-    if (!raw) return alert('Input kosong!');
-    const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
-    simpanKeStore(masukStore, kodeList).then(() => {
-      alert('Disimpan!');
-      document.getElementById('kodeMasuk').value = '';
-      incSyncCounter(kodeList.length);
-    });
-  }
+ function simpanMasuk() {
+  const raw = document.getElementById('kodeMasuk').value.trim();
+  if (!raw) return alert('Input kode barang masuk kosong!');
+  const kodeList = raw.split('\n').map(x => x.trim()).filter(x => x);
+  simpanKeStore(masukStore, kodeList).then(() => {
+    alert('Berhasil disimpan!');
+    document.getElementById('kodeMasuk').value = '';
+    incSyncCounter(kodeList.length);
+    tampilkanLaporan(); // <== auto update
+  });
+}
+
 
   function simpanKeluar() {
     const raw = document.getElementById('kodeKeluar').value.trim();
