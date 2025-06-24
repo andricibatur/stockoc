@@ -1,158 +1,182 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Laporan CS - Cocok Pesanan</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>Pencocokan Pesanan CS</title>
   <style>
-    body { font-family: sans-serif; padding: 10px; }
-    textarea, select, button { width: 100%; margin: 5px 0; padding: 6px; }
-    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    body { font-family: Arial, sans-serif; padding: 10px; }
+    textarea, button, select { width: 100%; margin: 10px 0; padding: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    th { background: #f0f0f0; }
-    .berhasil { background-color: #d4edda; }
-    .gagal { background-color: #f8d7da; }
+    th { background: #eee; }
   </style>
 </head>
 <body>
-  <h2>Cocok Data CS</h2>
+  <h3>Data Sumber</h3>
+  <textarea id="sumber" rows="6" placeholder="Sumber,Nama CS,No Pesanan,Tanggal"></textarea>
+  <button onclick="prosesSumber()">📥 Proses Sumber</button>
 
-  <label>Data Sumber (CSV: Sumber, Nama CS, No Pesanan, Tanggal)</label>
-  <textarea id="sumber"></textarea>
+  <h3>No Pesanan Berhasil</h3>
+  <textarea id="berhasil" rows="6" placeholder="No Pesanan..."></textarea>
+  <button onclick="tambahStatus('berhasil')">✅ Tambah Berhasil</button>
 
-  <label>No Pesanan Berhasil (pisah enter)</label>
-  <textarea id="berhasil"></textarea>
+  <h3>No Pesanan Gagal</h3>
+  <textarea id="gagal" rows="6" placeholder="No Pesanan..."></textarea>
+  <button onclick="tambahStatus('gagal')">❌ Tambah Gagal</button>
 
-  <label>No Pesanan Gagal (pisah enter)</label>
-  <textarea id="gagal"></textarea>
+  <button onclick="hapusStatus('berhasil', 36)">🗑 Hapus Baris Berhasil</button>
+  <button onclick="hapusStatus('gagal', 36)">🗑 Hapus Baris Gagal</button>
 
-  <button onclick="proses()">🔍 Proses & Simpan</button>
-
-  <label>Filter Bulan (YYYY-MM)</label>
-  <input type="month" id="filterBulan" onchange="tampilkanLaporan()" />
+  <hr>
+  <select id="filterBulan" onchange="tampilkanLaporan()">
+    <option value="">-- Semua Bulan --</option>
+  </select>
+  <button onclick="exportCSV()">⬇ Ekspor CSV</button>
 
   <div id="laporan"></div>
 
   <script>
-    const DB_NAME = "LaporanCS_DB";
-    const STORE_NAME = "laporan";
-    let db, hasilGlobal = {};
+    let hasilData = [];
 
-    // IndexedDB setup
-    const bukaDB = () => new Promise((res, rej) => {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = e => {
-        const db = e.target.result;
-        db.createObjectStore(STORE_NAME, { keyPath: 'cs' });
-      };
-      req.onsuccess = e => { db = e.target.result; res(); };
-      req.onerror = e => rej(e);
-    });
-
-    const simpanKeDB = (data) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      Object.keys(data).forEach(cs => store.put({ cs, data: data[cs] }));
-    };
-
-    const ambilSemua = () => new Promise((res, rej) => {
-      const tx = db.transaction(STORE_NAME, "readonly");
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.getAll();
-      req.onsuccess = () => {
-        const hasil = {};
-        req.result.forEach(item => hasil[item.cs] = item.data);
-        hasilGlobal = hasil;
-        res();
-      };
-      req.onerror = rej;
-    });
-
-    function proses() {
-      const sumberText = document.getElementById("sumber").value.trim();
-      const berhasil = document.getElementById("berhasil").value.trim().split('\n').map(s => s.trim());
-      const gagal = document.getElementById("gagal").value.trim().split('\n').map(s => s.trim());
-
-      const rows = sumberText.split('\n').map(row => row.split(',').map(cell => cell.trim()));
-      const header = rows.shift();
-      const index = {
-        sumber: header.indexOf("Sumber"),
-        cs: header.indexOf("Nama CS"),
-        no: header.indexOf("No Pesanan"),
-        tgl: header.indexOf("Tanggal")
-      };
-
-      const perCS = {};
-      rows.forEach(row => {
-        const cs = row[index.cs];
-        const no = row[index.no];
-        const tgl = row[index.tgl];
-        const status = berhasil.includes(no) ? 'berhasil' : gagal.includes(no) ? 'gagal' : 'tidak ditemukan';
-        if (!perCS[cs]) perCS[cs] = [];
-        perCS[cs].push({ no, tgl, status });
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open("csMatchDB", 1);
+        req.onupgradeneeded = e => {
+          const db = e.target.result;
+          db.createObjectStore("data", { keyPath: "no" });
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = reject;
       });
+    }
 
-      hasilGlobal = perCS;
-      simpanKeDB(perCS);
+    async function prosesSumber() {
+      const list = document.getElementById("sumber").value.trim().split("\n");
+      const db = await openDB();
+      const tx = db.transaction("data", "readwrite");
+      const store = tx.objectStore("data");
+      for (let baris of list) {
+        const [_, cs, no, tgl] = baris.split(",");
+        if (!no) continue;
+        store.put({ cs, no, tgl, status: "tidak ditemukan" });
+      }
+      document.getElementById("sumber").value = "";
       tampilkanLaporan();
     }
 
-    function tampilkanLaporan() {
-      const bulan = document.getElementById("filterBulan").value;
-      let html = '';
-      for (const cs in hasilGlobal) {
-        const entri = hasilGlobal[cs].filter(e => !bulan || e.tgl.startsWith(bulan));
-        if (entri.length === 0) continue;
-        const total = entri.length;
-        const sukses = entri.filter(e => e.status === "berhasil").length;
-        const gagal = entri.filter(e => e.status === "gagal").length;
+    async function tambahStatus(jenis) {
+      const textarea = document.getElementById(jenis);
+      const list = textarea.value.trim().split("\n").map(x => x.trim());
+      const db = await openDB();
+      const tx = db.transaction("data", "readwrite");
+      const store = tx.objectStore("data");
 
-        html += `<h3>${cs} (✔️ ${sukses} / ❌ ${gagal})</h3>`;
-        html += `<button onclick="cetakPDF('${cs}')">🖨 Cetak PDF</button>
-                 <button onclick="exportCSV('${cs}')">⬇ Export CSV</button>`;
-        html += `<table><tr><th>No Pesanan</th><th>Tanggal</th><th>Status</th></tr>`;
-        entri.forEach(e => {
-          html += `<tr class="${e.status}"><td>${e.no}</td><td>${e.tgl}</td><td>${e.status}</td></tr>`;
-        });
-        html += `</table><hr/>`;
+      for (let no of list) {
+        const req = store.get(no);
+        req.onsuccess = () => {
+          const data = req.result;
+          if (data) {
+            data.status = jenis;
+            store.put(data);
+          }
+        };
       }
-      document.getElementById("laporan").innerHTML = html;
+      textarea.value = "";
+      tx.oncomplete = tampilkanLaporan;
     }
 
-    function cetakPDF(cs) {
-      const data = hasilGlobal[cs].filter(e => {
-        const bulan = document.getElementById("filterBulan").value;
-        return !bulan || e.tgl.startsWith(bulan);
-      });
-      const tgl = new Date().toISOString().substring(0, 10);
-      const win = window.open('', '_blank');
-      win.document.write(`<html><head><title>${cs}</title></head><body>`);
-      win.document.write(`<h2>Laporan ${cs} - ${tgl}</h2><table border="1"><tr><th>No</th><th>Tanggal</th><th>Status</th></tr>`);
-      data.forEach(e => win.document.write(`<tr><td>${e.no}</td><td>${e.tgl}</td><td>${e.status}</td></tr>`));
-      win.document.write(`</table></body></html>`);
-      win.document.close(); win.print();
+    async function hapusStatus(jenis, kunciJawaban) {
+      const jawaban = prompt(`ketik 36 '${jenis}'?`);
+      if (parseInt(jawaban) !== kunciJawaban) return alert("Jawaban salah. Tidak dihapus.");
+      const db = await openDB();
+      const tx = db.transaction("data", "readwrite");
+      const store = tx.objectStore("data");
+      const allReq = store.getAll();
+
+      allReq.onsuccess = () => {
+        allReq.result.forEach(d => {
+          if (d.status === jenis) store.delete(d.no);
+        });
+        tampilkanLaporan();
+      };
     }
 
-    function exportCSV(cs) {
-      const data = hasilGlobal[cs].filter(e => {
-        const bulan = document.getElementById("filterBulan").value;
-        return !bulan || e.tgl.startsWith(bulan);
+    async function tampilkanLaporan() {
+      const db = await openDB();
+      const tx = db.transaction("data", "readonly");
+      const store = tx.objectStore("data");
+      const req = store.getAll();
+
+      req.onsuccess = () => {
+        hasilData = req.result;
+        const filter = document.getElementById("filterBulan").value;
+        const grouped = {}, bulanMap = {};
+
+        hasilData.forEach(d => {
+          const bln = d.tgl?.slice(0, 7);
+          if (filter && bln !== filter) return;
+          if (!grouped[d.cs]) grouped[d.cs] = [];
+          grouped[d.cs].push(d);
+          bulanMap[bln] = true;
+        });
+
+        const bulanEl = document.getElementById("filterBulan");
+        bulanEl.innerHTML = '<option value="">-- Semua Bulan --</option>';
+        Object.keys(bulanMap).sort().forEach(b => {
+          const opt = document.createElement("option");
+          opt.value = b;
+          opt.textContent = b;
+          if (b === filter) opt.selected = true;
+          bulanEl.appendChild(opt);
+        });
+
+        let html = "";
+        for (const cs in grouped) {
+          const list = grouped[cs];
+          const berhasil = list.filter(d => d.status === "berhasil").length;
+          const gagal = list.filter(d => d.status === "gagal").length;
+
+          html += `<h4>${cs} - ✅ ${berhasil}, ❌ ${gagal} <button onclick="printCS('${cs}')">🖨 Print</button></h4>`;
+          html += `<table><tr><th>No Pesanan</th><th>Tanggal</th><th>Status</th></tr>`;
+          list.forEach(d => {
+            html += `<tr><td>${d.no}</td><td>${d.tgl}</td><td>${d.status}</td></tr>`;
+          });
+          html += "</table><br/>";
+        }
+
+        document.getElementById("laporan").innerHTML = html;
+      };
+    }
+
+    function exportCSV() {
+      if (!hasilData.length) return alert("Belum ada data");
+      let csv = "Nama CS,No Pesanan,Tanggal,Status\n";
+      hasilData.forEach(d => {
+        csv += `${d.cs},${d.no},${d.tgl},${d.status}\n`;
       });
-      let csv = "No Pesanan,Tanggal,Status\n";
-      data.forEach(e => csv += `"${e.no}","${e.tgl}","${e.status}"\n`);
+
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Laporan-${cs}.csv`;
+      a.download = "laporan_cs.csv";
       a.click();
     }
 
-    window.onload = async () => {
-      await bukaDB();
-      await ambilSemua();
-      tampilkanLaporan();
-    };
+    function printCS(cs) {
+      const rows = hasilData.filter(d => d.cs === cs);
+      const w = window.open("", "", "width=800,height=600");
+      w.document.write(`<h3>Laporan CS: ${cs}</h3>`);
+      w.document.write(`<table border="1" cellpadding="6" cellspacing="0"><tr><th>No Pesanan</th><th>Tanggal</th><th>Status</th></tr>`);
+      rows.forEach(d => {
+        w.document.write(`<tr><td>${d.no}</td><td>${d.tgl}</td><td>${d.status}</td></tr>`);
+      });
+      w.document.write("</table>");
+      w.document.close();
+      w.print();
+    }
+
+    window.onload = tampilkanLaporan;
   </script>
 </body>
 </html>
