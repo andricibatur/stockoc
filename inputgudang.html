@@ -146,26 +146,30 @@
       a.click();
     }
 
-    function syncToSheet() {
-      if (!lastData.length) return alert("Tidak ada data untuk disinkron!");
-      const btn = document.getElementById("syncBtn");
-      btn.disabled = true;
-      btn.classList.remove("blink");
-      fetch(`${SHEETDB_API}?sheet=Sheet1&on_conflict=update`, {
-        method: "PUT",
+   function syncToSheet() {
+  if (!lastData.length) return alert("Tidak ada data untuk disinkron!");
+  const btn = document.getElementById("syncBtn");
+  btn.disabled = true;
+  btn.classList.remove("blink");
+
+  fetch(`${SHEETDB_API}/all`, { method: "DELETE" })
+    .then(() => {
+      return fetch(`${SHEETDB_API}`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: lastData })
-      })
-        .then(r => r.json())
-        .then(r => {
-          alert("✅ Sinkronisasi berhasil");
-          counter = 0;
-        })
-        .catch(e => alert("❌ Sinkron gagal: " + e))
-        .finally(() => {
-          btn.disabled = false;
-        });
-    }
+      });
+    })
+    .then(r => r.json())
+    .then(r => {
+      alert("✅ Sinkronisasi berhasil");
+      counter = 0;
+    })
+    .catch(e => alert("❌ Sinkron gagal: " + e))
+    .finally(() => {
+      btn.disabled = false;
+    });
+}
 
     function checkAutoSync() {
       const btn = document.getElementById("syncBtn");
