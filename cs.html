@@ -7,7 +7,7 @@
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body { font-family: sans-serif; padding: 10px; }
-    input, button, textarea { width: 100%; padding: 10px; margin: 5px 0; }
+    input, button, textarea, select { width: 100%; padding: 10px; margin: 5px 0; }
     textarea { height: 120px; }
     #laporan { background: #f0f0f0; padding: 10px; white-space: pre-wrap; }
   </style>
@@ -18,7 +18,17 @@
   <label>Sumber:</label>
   <input id="sumber" placeholder="Contoh: Shopee">
   <label>Nama CS:</label>
-  <input id="cs" placeholder="Contoh: Dafa">
+  <select id="cs">
+    <option value="">Pilih CS</option>
+    <option value="Yusi">Yusi</option>
+    <option value="Sipa">Sipa</option>
+    <option value="Izal">Izal</option>
+    <option value="Dava">Dava</option>
+    <option value="Cecep">Cecep</option>
+    <option value="Nobel">Nobel</option>
+    <option value="Oc">Oc</option>
+    <option value="Duka">Duka</option>
+  </select>
   <label>Tanggal Kirim:</label>
   <input id="tanggal" type="date" value="">
 
@@ -35,6 +45,8 @@
 
   <!-- Suara bip -->
   <audio id="bip" src="https://www.soundjay.com/buttons/sounds/beep-07.mp3" preload="auto"></audio>
+  <!-- Suara success -->
+  <audio id="successSound" src="https://www.soundjay.com/buttons/sounds/button-09.mp3" preload="auto"></audio>
 
   <script>
     let db, html5QrCode, scanning = false
@@ -88,6 +100,7 @@
       localStorage.setItem("laporan", baru)
       document.getElementById("hasilScan").textContent = pesanan
       document.getElementById("bip").play()
+      setTimeout(() => document.getElementById("successSound").play(), 200) // Play success sound after beep
       simpanForm()
       muatLaporan()
     }
