@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Laporan Transaksi</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+    th { background: #eee; }
+    button { margin: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Laporan Transaksi</h1>
+
+  <button onclick="loadData()">Muat Data</button>
+  <button onclick="print()">Cetak</button>
+  <button onclick="exportData()">Export JSON</button>
+  <input type="file" id="importFile" accept=".json" onchange="importData(event)"/>
+  <button onclick="showReport('daily')">Harian</button>
+  <button onclick="showReport('weekly')">Mingguan</button>
+  <button onclick="showReport('monthly')">Bulanan</button>
+
+  <div id="report"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tabletop.js/1.5.1/tabletop.min.js"></script>
+  <script>
+    const dbName = "LaporanDB";
+    let db, rawData = [];
+
+    // Buka IndexedDB
+    let openRequest = indexedDB.open(dbName, 1);
+    openRequest.onupgradeneeded = e => {
+      db = e.target.result;
+      db.createObjectStore("laporan", { keyPath: "id" });
+    };
+    openRequest.onsuccess = e => db = e.target.result;
+
+    function loadData() {
+      Tabletop.init({
+        key: 'https://docs.google.com/spreadsheets/d/1N8sXeMqAiqGJgFTEXgexEeF9sWcOzM1pLApPhOvZfBA/edit?usp=sharing',
+        simpleSheet: true,
+        callback: data => {
+          rawData = data.map((d, i) => ({ id: i+1, ...d }));
+          saveToIndexedDB();
+          alert("Data dimuat & disimpan offline!");
+        }
+      });
+    }
+
+    function saveToIndexedDB() {
+      let tx = db.transaction("laporan", "readwrite");
+      let store = tx.objectStore("laporan");
+      store.clear();
+      rawData.forEach(row => store.put(row));
+    }
+
+    function getData(callback) {
+      let tx = db.transaction("laporan", "readonly");
+      let store = tx.objectStore("laporan");
+      let req = store.getAll();
+      req.onsuccess = e => callback(e.target.result);
+    }
+
+    function groupBy(data, period) {
+      let groups = {};
+      data.forEach(row => {
+        let tgl = new Date(row.Tanggal);
+        let key = "";
+        if (period === 'daily') {
+          key = tgl.toISOString().split('T')[0];
+        } else if (period === 'weekly') {
+          let week = getWeekNumber(tgl);
+          key = `${tgl.getFullYear()}-Minggu-${week}`;
+        } else if (period === 'monthly') {
+          key = `${tgl.getFullYear()}-${tgl.getMonth()+1}`;
+        }
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+      });
+      return groups;
+    }
+
+    function getWeekNumber(d) {
+      d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      let dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      let yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+      return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+    }
+
+    function showReport(period) {
+      getData(data => {
+        let groups = groupBy(data, period);
+        let html = `<table><thead><tr><th>Periode</th><th>Total</th></tr></thead><tbody>`;
+        for (let key in groups) {
+          let total = groups[key].reduce((sum, row) => sum + Number(row.Total || 0), 0);
+          html += `<tr><td>${key}</td><td>${total}</td></tr>`;
+        }
+        html += `</tbody></table>`;
+        document.getElementById("report").innerHTML = html;
+      });
+    }
+
+    function exportData() {
+      getData(data => {
+        let blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement("a");
+        a.href = url;
+        a.download = "laporan.json";
+        a.click();
+      });
+    }
+
+    function importData(event) {
+      let file = event.target.files[0];
+      let reader = new FileReader();
+      reader.onload = e => {
+        rawData = JSON.parse(e.target.result);
+        saveToIndexedDB();
+        alert("Import sukses!");
+      };
+      reader.readAsText(file);
+    }
+  </script>
+</body>
+</html>
