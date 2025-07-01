@@ -15,7 +15,7 @@
 <body>
   <h1>Laporan Transaksi</h1>
 
-  <button onclick="loadData()">Muat Data</button>
+  <button onclick="loadData()">Muat Data CSV</button>
   <button onclick="print()">Cetak</button>
   <button onclick="exportData()">Export JSON</button>
   <input type="file" id="importFile" accept=".json" onchange="importData(event)"/>
@@ -25,12 +25,12 @@
 
   <div id="report"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tabletop.js/1.5.1/tabletop.min.js"></script>
   <script>
     const dbName = "LaporanDB";
     let db, rawData = [];
+    const csvURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRJfwUBw_3yMlRXp5yoQDWcuRYY8VvzVwe3SKk-8EBquNGJIYf7AQpSU_G6nCpyM1Q1E6L3_SGrLSCj/pub?gid=1920002420&single=true&output=csv";
 
-    // Buka IndexedDB
+    // IndexedDB setup
     let openRequest = indexedDB.open(dbName, 1);
     openRequest.onupgradeneeded = e => {
       db = e.target.result;
@@ -38,16 +38,18 @@
     };
     openRequest.onsuccess = e => db = e.target.result;
 
-    function loadData() {
-      Tabletop.init({
-        key: 'https://docs.google.com/spreadsheets/d/1N8sXeMqAiqGJgFTEXgexEeF9sWcOzM1pLApPhOvZfBA/edit?usp=sharing',
-        simpleSheet: true,
-        callback: data => {
-          rawData = data.map((d, i) => ({ id: i+1, ...d }));
-          saveToIndexedDB();
-          alert("Data dimuat & disimpan offline!");
-        }
+    async function loadData() {
+      const res = await fetch(csvURL);
+      const text = await res.text();
+      const rows = text.split("\n").map(r => r.split(","));
+      const headers = rows.shift().map(h => h.trim());
+      rawData = rows.map((r, i) => {
+        let obj = { id: i+1 };
+        headers.forEach((h, j) => obj[h] = r[j]);
+        return obj;
       });
+      saveToIndexedDB();
+      alert("Data CSV dimuat & disimpan offline!");
     }
 
     function saveToIndexedDB() {
@@ -67,7 +69,8 @@
     function groupBy(data, period) {
       let groups = {};
       data.forEach(row => {
-        let tgl = new Date(row.Tanggal);
+        let tgl = new Date(row.Tanggal || row.Date);
+        if (isNaN(tgl)) return; // skip invalid date
         let key = "";
         if (period === 'daily') {
           key = tgl.toISOString().split('T')[0];
@@ -96,7 +99,7 @@
         let groups = groupBy(data, period);
         let html = `<table><thead><tr><th>Periode</th><th>Total</th></tr></thead><tbody>`;
         for (let key in groups) {
-          let total = groups[key].reduce((sum, row) => sum + Number(row.Total || 0), 0);
+          let total = groups[key].reduce((sum, row) => sum + Number(row.Total || row.Jumlah || 0), 0);
           html += `<tr><td>${key}</td><td>${total}</td></tr>`;
         }
         html += `</tbody></table>`;
